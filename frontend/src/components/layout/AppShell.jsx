@@ -6,28 +6,37 @@ import Header from "./Header"
 import { Menu, X } from "lucide-react"
 
 export default function AppShell({ children, title = "Dashboard" }) {
-  const [mobileOpen, setMobileOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   return (
     <div className="min-h-screen bg-[#050505] text-white">
       <div className="flex min-h-screen">
-        <Sidebar />
+        <Sidebar
+          collapsed={sidebarCollapsed}
+          onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        />
 
-        {mobileOpen && (
-          <div className="fixed inset-0 z-50 flex md:hidden">
+        {mobileMenuOpen && (
+          <div className="fixed inset-0 z-50 md:hidden">
             <div
-              className="absolute inset-0 bg-black/70"
-              onClick={() => setMobileOpen(false)}
+              className="absolute inset-0 bg-black/75 backdrop-blur-sm"
+              onClick={() => setMobileMenuOpen(false)}
             />
 
             <div className="relative z-10 h-full w-72">
-              <Sidebar mobile />
+              <Sidebar
+                mobile
+                collapsed={false}
+                onToggle={() => setMobileMenuOpen(false)}
+                onNavigate={() => setMobileMenuOpen(false)}
+              />
             </div>
 
             <button
               type="button"
-              onClick={() => setMobileOpen(false)}
-              className="absolute right-4 top-4 z-20 flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-black text-white"
+              onClick={() => setMobileMenuOpen(false)}
+              className="absolute right-4 top-4 z-20 flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-black text-white shadow-xl"
             >
               <X className="h-5 w-5" />
             </button>
@@ -40,7 +49,7 @@ export default function AppShell({ children, title = "Dashboard" }) {
           <div className="border-b border-white/10 bg-black/40 px-5 py-3 md:hidden">
             <button
               type="button"
-              onClick={() => setMobileOpen(true)}
+              onClick={() => setMobileMenuOpen(true)}
               className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#0b0b0d] px-4 py-2 text-sm font-bold text-white"
             >
               <Menu className="h-5 w-5 text-[#ffd400]" />
