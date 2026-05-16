@@ -27,13 +27,20 @@ const menu = [
   { label: "Ventas productos", href: "/ventas-productos", icon: ShoppingCart },
 ]
 
-export default function Sidebar({ collapsed = false, onToggle }) {
-  return (
-    <aside
-      className={`hidden min-h-screen border-r border-white/10 bg-[#070707] p-4 transition-all duration-300 md:block ${
+export default function Sidebar({
+  collapsed = false,
+  onToggle,
+  mobile = false,
+  onNavigate,
+}) {
+  const asideClass = mobile
+    ? "block min-h-screen w-72 border-r border-white/10 bg-[#070707] p-4"
+    : `hidden min-h-screen border-r border-white/10 bg-[#070707] p-4 transition-all duration-300 md:block ${
         collapsed ? "w-20" : "w-72"
-      }`}
-    >
+      }`
+
+  return (
+    <aside className={asideClass}>
       <div
         className={`mb-6 overflow-hidden rounded-[1.7rem] border border-[#ffd400]/30 bg-gradient-to-br from-[#d90416] to-[#050505] shadow-xl transition-all ${
           collapsed ? "p-3" : "p-5"
@@ -48,7 +55,7 @@ export default function Sidebar({ collapsed = false, onToggle }) {
             <Zap className="h-7 w-7 fill-black" />
           </div>
 
-          {!collapsed && (
+          {!collapsed && !mobile && (
             <button
               type="button"
               onClick={onToggle}
@@ -77,7 +84,7 @@ export default function Sidebar({ collapsed = false, onToggle }) {
         )}
       </div>
 
-      {collapsed && (
+      {collapsed && !mobile && (
         <button
           type="button"
           onClick={onToggle}
@@ -96,6 +103,7 @@ export default function Sidebar({ collapsed = false, onToggle }) {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onNavigate}
               title={collapsed ? item.label : undefined}
               className={`group flex items-center gap-3 rounded-2xl border border-transparent px-3 py-3 text-sm font-semibold text-zinc-300 transition hover:border-[#d90416]/40 hover:bg-[#d90416]/15 hover:text-white ${
                 collapsed ? "justify-center" : ""
@@ -114,6 +122,7 @@ export default function Sidebar({ collapsed = false, onToggle }) {
       <div className="mt-8 border-t border-white/10 pt-4">
         <Link
           href="/configuracion"
+          onClick={onNavigate}
           title={collapsed ? "Configuración" : undefined}
           className={`flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold text-zinc-400 transition hover:bg-white/5 hover:text-white ${
             collapsed ? "justify-center" : ""
