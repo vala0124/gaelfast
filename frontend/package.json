@@ -1,0 +1,35 @@
+{
+  "name": "betadmin-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@radix-ui/react-dialog": "latest",
+    "@radix-ui/react-dropdown-menu": "latest",
+    "@radix-ui/react-label": "latest",
+    "@radix-ui/react-select": "latest",
+    "@radix-ui/react-separator": "latest",
+    "@radix-ui/react-slot": "latest",
+    "axios": "latest",
+    "class-variance-authority": "latest",
+    "clsx": "latest",
+    "lucide-react": "latest",
+    "next": "latest",
+    "radix-ui": "^1.4.3",
+    "react": "latest",
+    "react-dom": "latest",
+    "recharts": "latest",
+    "tailwind-merge": "latest"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "latest",
+    "@types/node": "25.8.0",
+    "@types/react": "19.2.14",
+    "tailwindcss": "latest",
+    "typescript": "6.0.3"
+  }
+}

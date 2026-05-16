@@ -1,0 +1,150 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String
+  role      String   @default("ADMIN")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  recharges    Recharge[]
+  withdrawals  Withdrawal[]
+  cashEntries  CashEntry[]
+  productSales ProductSale[]
+}
+
+model Client {
+  id        Int      @id @default(autoincrement())
+  cedula    String   @unique
+  name      String
+  email     String?
+  phone     String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  recharges   Recharge[]
+  withdrawals Withdrawal[]
+}
+
+model BetHouse {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  active    Boolean  @default(true)
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  recharges   Recharge[]
+  withdrawals Withdrawal[]
+  cashEntries CashEntry[]
+}
+
+model Recharge {
+  id            Int      @id @default(autoincrement())
+  clientId      Int
+  betHouseId    Int
+  userId        Int?
+  amount        Float
+  paymentMethod String
+  receiptNumber String?
+  notes         String?
+  status        String   @default("RECARGADO")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  client   Client   @relation(fields: [clientId], references: [id])
+  betHouse BetHouse @relation(fields: [betHouseId], references: [id])
+  user     User?    @relation(fields: [userId], references: [id])
+}
+
+model Withdrawal {
+  id             Int      @id @default(autoincrement())
+  clientId       Int
+  betHouseId     Int
+  userId         Int?
+  amount         Float
+  withdrawalCode String?
+  receiptNumber  String?
+  paidToClient   Boolean  @default(false)
+  notes          String?
+  status         String   @default("PENDIENTE")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  client      Client      @relation(fields: [clientId], references: [id])
+  betHouse    BetHouse    @relation(fields: [betHouseId], references: [id])
+  user        User?       @relation(fields: [userId], references: [id])
+  cashEntries CashEntry[]
+}
+
+model CashEntry {
+  id            Int      @id @default(autoincrement())
+  type          String
+  amount        Float
+  paymentMethod String?
+  receiptNumber String?
+  notes         String?
+  betHouseId    Int?
+  withdrawalId  Int?
+  userId        Int?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  betHouse   BetHouse?   @relation(fields: [betHouseId], references: [id])
+  withdrawal Withdrawal? @relation(fields: [withdrawalId], references: [id])
+  user       User?       @relation(fields: [userId], references: [id])
+}
+
+model Product {
+  id            Int      @id @default(autoincrement())
+  name          String
+  barcode       String?  @unique
+  category      String?
+  purchasePrice Float    @default(0)
+  salePrice     Float
+  stock         Int      @default(0)
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  sales ProductSale[]
+}
+
+model ProductSale {
+  id            Int      @id @default(autoincrement())
+  productId     Int
+  userId        Int?
+  quantity      Int
+  unitPrice     Float
+  total         Float
+  paymentMethod String
+  createdAt     DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id])
+  user    User?   @relation(fields: [userId], references: [id])
+}
+
+model CashClosing {
+  id              Int      @id @default(autoincrement())
+  closingDate     DateTime @unique
+  expectedValues  Json
+  realValues      Json
+  summary         Json
+  expectedTotal   Float
+  realTotal       Float
+  differenceTotal Float
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
