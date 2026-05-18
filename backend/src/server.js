@@ -850,10 +850,12 @@ app.post("/api/recharges", async (req, res) => {
               },
             })
 
-            const commission =
+            const commissionPercent =
               commissionSetting && commissionSetting.active
                 ? Number(commissionSetting.amount || 0)
                 : 0
+
+            const commission = (numericAmount * commissionPercent) / 100
 
             const recharge = await prisma.recharge.create({
               data: {
@@ -966,10 +968,12 @@ app.post("/api/withdrawals", async (req, res) => {
             },
           })
 
-          const commission =
+          const commissionPercent =
             commissionSetting && commissionSetting.active
               ? Number(commissionSetting.amount || 0)
               : 0
+
+          const commission = (numericAmount * commissionPercent) / 100
 
           const withdrawal = await prisma.withdrawal.create({
             data: {

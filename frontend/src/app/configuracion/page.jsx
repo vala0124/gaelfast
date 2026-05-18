@@ -334,10 +334,10 @@ export default function ConfiguracionPage() {
                   <TableRow className="border-white/10 bg-white/[0.03] hover:bg-white/[0.03]">
                     <TableHead className="text-zinc-400">Casa</TableHead>
                     <TableHead className="text-zinc-400">
-                      Comisión recarga
+                    % comisión recarga
                     </TableHead>
                     <TableHead className="text-zinc-400">
-                      Comisión retiro
+                    % comisión retiro
                     </TableHead>
                     <TableHead className="text-zinc-400">Estado</TableHead>
                     <TableHead className="text-right text-zinc-400">
@@ -393,7 +393,7 @@ export default function ConfiguracionPage() {
                                 e.target.value
                               )
                             }
-                            placeholder="0.00"
+                            placeholder="0.00 %"
                             className="h-10 max-w-[160px] border-white/10 bg-black text-white placeholder:text-zinc-600"
                           />
                         </TableCell>
