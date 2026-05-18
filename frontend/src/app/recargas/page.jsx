@@ -38,14 +38,6 @@ import {
   Wallet,
 } from "lucide-react"
 
-const banks = [
-  "Coopmego",
-  "Banco Guayaquil",
-  "Pichincha",
-  "JEP",
-  "Produbanco",
-]
-
 function formatMoney(value) {
   const number = Number(value || 0)
 
@@ -98,10 +90,13 @@ export default function RecargasPage() {
 
   const [clients, setClients] = useState([])
   const [betHouses, setBetHouses] = useState([])
+  const [banks, setBanks] = useState([])
   const [recharges, setRecharges] = useState([])
+
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
+
   const [search, setSearch] = useState("")
   const [startDate, setStartDate] = useState(today)
   const [endDate, setEndDate] = useState(today)
@@ -122,14 +117,17 @@ export default function RecargasPage() {
     try {
       setLoading(true)
 
-      const [clientsRes, housesRes, rechargesRes] = await Promise.all([
-        api.get("/api/clients"),
-        api.get("/api/bet-houses"),
-        api.get("/api/recharges"),
-      ])
+      const [clientsRes, housesRes, banksRes, rechargesRes] =
+        await Promise.all([
+          api.get("/api/clients"),
+          api.get("/api/bet-houses"),
+          api.get("/api/banks"),
+          api.get("/api/recharges"),
+        ])
 
       setClients(Array.isArray(clientsRes.data) ? clientsRes.data : [])
       setBetHouses(Array.isArray(housesRes.data) ? housesRes.data : [])
+      setBanks(Array.isArray(banksRes.data) ? banksRes.data : [])
       setRecharges(Array.isArray(rechargesRes.data) ? rechargesRes.data : [])
     } catch (error) {
       console.error(error)
@@ -138,6 +136,10 @@ export default function RecargasPage() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    loadData()
+  }, [])
 
   function findClientByCedula(value) {
     const cedula = String(value || "").trim()
@@ -290,10 +292,6 @@ export default function RecargasPage() {
     setTodayFilter()
   }
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
   const filteredRecharges = useMemo(() => {
     const text = search.toLowerCase().trim()
 
@@ -366,7 +364,8 @@ export default function RecargasPage() {
               Nueva recarga
             </CardTitle>
             <p className="text-sm text-zinc-400">
-              Ingresa primero la cédula o ID. Si el cliente ya existe, sus datos se completan automáticamente.
+              Ingresa primero la cédula o ID. Si el cliente ya existe, sus datos
+              se completan automáticamente.
             </p>
           </CardHeader>
 
@@ -423,11 +422,17 @@ export default function RecargasPage() {
                     </SelectTrigger>
 
                     <SelectContent className="border-white/10 bg-[#0b0b0d] text-white">
-                      {betHouses.map((house) => (
-                        <SelectItem key={house.id} value={String(house.id)}>
-                          {house.name}
+                      {betHouses.length === 0 ? (
+                        <SelectItem value="SIN_CASAS" disabled>
+                          Sin casas registradas
                         </SelectItem>
-                      ))}
+                      ) : (
+                        betHouses.map((house) => (
+                          <SelectItem key={house.id} value={String(house.id)}>
+                            {house.name}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -500,11 +505,17 @@ export default function RecargasPage() {
                         </SelectTrigger>
 
                         <SelectContent className="border-white/10 bg-[#0b0b0d] text-white">
-                          {banks.map((bank) => (
-                            <SelectItem key={bank} value={bank}>
-                              {bank}
+                          {banks.length === 0 ? (
+                            <SelectItem value="SIN_BANCOS" disabled>
+                              Sin bancos registrados
                             </SelectItem>
-                          ))}
+                          ) : (
+                            banks.map((bank) => (
+                              <SelectItem key={bank.id} value={bank.name}>
+                                {bank.name}
+                              </SelectItem>
+                            ))
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
@@ -671,7 +682,9 @@ export default function RecargasPage() {
                     <TableHead className="text-zinc-400">Cliente</TableHead>
                     <TableHead className="text-zinc-400">Celular</TableHead>
                     <TableHead className="text-zinc-400">Casa</TableHead>
-                    <TableHead className="text-zinc-400">Detalle de pago</TableHead>
+                    <TableHead className="text-zinc-400">
+                      Detalle de pago
+                    </TableHead>
                     <TableHead className="text-right text-zinc-400">
                       Monto
                     </TableHead>
