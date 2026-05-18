@@ -45,10 +45,26 @@ model BetHouse {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  recharges     Recharge[]
-  withdrawals   Withdrawal[]
-  cashEntries   CashEntry[]
-  houseBalances HouseBalance[]
+  recharges          Recharge[]
+  withdrawals        Withdrawal[]
+  cashEntries        CashEntry[]
+  houseBalances      HouseBalance[]
+  commissionSettings CommissionSetting[]
+}
+
+model CommissionSetting {
+  id            Int      @id @default(autoincrement())
+  betHouseId    Int
+  operationType String
+  amount        Float    @default(0)
+  active        Boolean  @default(true)
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  betHouse BetHouse @relation(fields: [betHouseId], references: [id])
+
+  @@unique([betHouseId, operationType])
 }
 
 model Recharge {
@@ -57,6 +73,7 @@ model Recharge {
   betHouseId    Int
   userId        Int?
   amount        Float
+  commission    Float    @default(0)
   paymentMethod String
   receiptNumber String?
   notes         String?
@@ -75,6 +92,7 @@ model Withdrawal {
   betHouseId     Int
   userId         Int?
   amount         Float
+  commission     Float    @default(0)
   withdrawalCode String?
   receiptNumber  String?
   paidToClient   Boolean  @default(false)

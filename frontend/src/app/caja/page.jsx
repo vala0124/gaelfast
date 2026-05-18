@@ -324,10 +324,16 @@ export default function CajaPage() {
     })
   }, [cashEntries, search, startDate, endDate])
 
+  function getDateKey(value) {
+    if (!value) return ""
+    return String(value).slice(0, 10)
+  }
+
   const filteredHouseBalances = useMemo(() => {
-    return houseBalances.filter((item) =>
-      isDateInsideRange(item.date, startDate, endDate)
-    )
+    return houseBalances.filter((item) => {
+      const dateKey = getDateKey(item.date)
+      return dateKey >= startDate && dateKey <= endDate
+    })
   }, [houseBalances, startDate, endDate])
 
   const totalInitialBalance = filteredHouseBalances.reduce(

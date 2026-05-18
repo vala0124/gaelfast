@@ -660,6 +660,93 @@ app.patch("/api/banks/:id", async (req, res) => {
   }
 })
 
+
+/* =========================
+   CONFIGURACIÓN DE COMISIONES
+========================= */
+app.get("/api/commission-settings", async (req, res) => {
+  try {
+    const settings = await prisma.commissionSetting.findMany({
+      orderBy: [
+        {
+          betHouse: {
+            name: "asc",
+          },
+        },
+        {
+          operationType: "asc",
+        },
+      ],
+      include: {
+        betHouse: true,
+      },
+    })
+
+    res.json(settings)
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({
+      error: "Error obteniendo configuración de comisiones",
+    })
+  }
+})
+
+app.post("/api/commission-settings", async (req, res) => {
+  try {
+    const { betHouseId, operationType, amount, active, notes } = req.body
+
+    if (!betHouseId || !operationType) {
+      return res.status(400).json({
+        error: "Casa de apuestas y tipo de operación son obligatorios",
+      })
+    }
+
+    if (!["RECARGA", "RETIRO"].includes(operationType)) {
+      return res.status(400).json({
+        error: "Tipo de operación inválido",
+      })
+    }
+
+    const numericAmount = toNumber(amount)
+
+    if (numericAmount < 0) {
+      return res.status(400).json({
+        error: "La comisión no puede ser negativa",
+      })
+    }
+
+    const setting = await prisma.commissionSetting.upsert({
+      where: {
+        betHouseId_operationType: {
+          betHouseId: Number(betHouseId),
+          operationType,
+        },
+      },
+      update: {
+        amount: numericAmount,
+        active: active === undefined ? true : Boolean(active),
+        notes: notes || null,
+      },
+      create: {
+        betHouseId: Number(betHouseId),
+        operationType,
+        amount: numericAmount,
+        active: active === undefined ? true : Boolean(active),
+        notes: notes || null,
+      },
+      include: {
+        betHouse: true,
+      },
+    })
+
+    res.status(201).json(setting)
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({
+      error: "Error guardando configuración de comisión",
+    })
+  }
+})
 /* =========================
    RECARGAS
 ========================= */
