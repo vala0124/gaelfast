@@ -123,38 +123,38 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {
 app.post("/api/seed", async (req, res) => {
   try {
     const defaultUsers = [
-  {
-    name: "Administrador",
-    email: "admin@empresa.com",
-    password: "123456",
-    role: "ADMIN",
-  },
-  {
-    name: "Klever Ágreda",
-    email: "kleverventas@gaelfast.com",
-    password: "123456",
-    role: "VENDEDOR",
-  },
-]
-
-for (const userData of defaultUsers) {
-  const existingUser = await prisma.user.findUnique({
-    where: { email: userData.email },
-  })
-
-  if (!existingUser) {
-    const hashed = await bcrypt.hash(userData.password, 10)
-
-    await prisma.user.create({
-      data: {
-        name: userData.name,
-        email: userData.email,
-        password: hashed,
-        role: userData.role,
+      {
+        name: "Administrador",
+        email: "admin@empresa.com",
+        password: "123456",
+        role: "ADMIN",
       },
-    })
-  }
-}
+      {
+        name: "Klever Ágreda",
+        email: "kleverventas@gaelfast.com",
+        password: "123456",
+        role: "VENDEDOR",
+      },
+    ]
+
+    for (const userData of defaultUsers) {
+      const existingUser = await prisma.user.findUnique({
+        where: { email: userData.email },
+      })
+
+      if (!existingUser) {
+        const hashed = await bcrypt.hash(userData.password, 10)
+
+        await prisma.user.create({
+          data: {
+            name: userData.name,
+            email: userData.email,
+            password: hashed,
+            role: userData.role,
+          },
+        })
+      }
+    }
 
     const houses = ["Ecuabet", "Doradobet", "Mas1x2", "ASTROBET"]
 
@@ -177,23 +177,44 @@ for (const userData of defaultUsers) {
       })
     }
 
+    const banks = [
+      "Coopmego",
+      "Banco Guayaquil",
+      "Pichincha",
+      "Banco de Loja",
+      "JEP",
+      "Produbanco",
+    ]
+
+    await prisma.bank.updateMany({
+      data: {
+        active: false,
+      },
+    })
+
+    for (const bank of banks) {
+      await prisma.bank.upsert({
+        where: { name: bank },
+        update: {
+          active: true,
+        },
+        create: {
+          name: bank,
+          active: true,
+        },
+      })
+    }
+
     res.json({
       message: "Datos iniciales creados correctamente",
-      users: [
-        {
-          name: "Administrador",
-          email: "admin@empresa.com",
-          password: "123456",
-          role: "ADMIN",
-        },
-        {
-          name: "Klever Ágreda",
-          email: "kleverventas@gaelfast.com",
-          password: "123456",
-          role: "VENDEDOR",
-        },
-      ],
+      users: defaultUsers.map((user) => ({
+        name: user.name,
+        email: user.email,
+        password: user.password,
+        role: user.role,
+      })),
       houses,
+      banks,
     })
   } catch (error) {
     console.error(error)
@@ -547,6 +568,94 @@ app.post("/api/bet-houses", async (req, res) => {
 
     res.status(500).json({
       error: "Error creando casa de apuestas",
+    })
+  }
+})
+
+/* =========================
+   BANCOS
+========================= */
+app.get("/api/banks", async (req, res) => {
+  try {
+    const banks = await prisma.bank.findMany({
+      where: {
+        active: true,
+      },
+      orderBy: {
+        name: "asc",
+      },
+    })
+
+    res.json(banks)
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({
+      error: "Error obteniendo bancos",
+    })
+  }
+})
+
+app.post("/api/banks", async (req, res) => {
+  try {
+    const { name, notes } = req.body
+
+    if (!name) {
+      return res.status(400).json({
+        error: "El nombre del banco es obligatorio",
+      })
+    }
+
+    const bank = await prisma.bank.upsert({
+      where: {
+        name: String(name).trim(),
+      },
+      update: {
+        active: true,
+        notes: notes || null,
+      },
+      create: {
+        name: String(name).trim(),
+        notes: notes || null,
+        active: true,
+      },
+    })
+
+    res.status(201).json(bank)
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({
+      error: "Error creando banco",
+    })
+  }
+})
+
+app.patch("/api/banks/:id", async (req, res) => {
+  try {
+    const bankId = Number(req.params.id)
+    const { name, active, notes } = req.body
+
+    if (!bankId) {
+      return res.status(400).json({
+        error: "ID de banco inválido",
+      })
+    }
+
+    const bank = await prisma.bank.update({
+      where: {
+        id: bankId,
+      },
+      data: {
+        ...(name !== undefined && { name: String(name).trim() }),
+        ...(active !== undefined && { active: Boolean(active) }),
+        ...(notes !== undefined && { notes: notes || null }),
+      },
+    })
+
+    res.json(bank)
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({
+      error: "Error actualizando banco",
     })
   }
 })
