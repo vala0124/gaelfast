@@ -881,6 +881,83 @@ app.post("/api/withdrawals", async (req, res) => {
 })
 
 /* =========================
+   SALDOS INICIALES POR CASA
+========================= */
+app.get("/api/house-balances", async (req, res) => {
+  try {
+    const balances = await prisma.houseBalance.findMany({
+      orderBy: {
+        date: "desc",
+      },
+      include: {
+        betHouse: true,
+      },
+    })
+
+    res.json(balances)
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({
+      error: "Error obteniendo saldos iniciales",
+    })
+  }
+})
+
+app.post("/api/house-balances", async (req, res) => {
+  try {
+    const { betHouseId, date, amount, notes } = req.body
+
+    if (!betHouseId || !date || amount === undefined || amount === null) {
+      return res.status(400).json({
+        error: "Casa, fecha y saldo inicial son obligatorios",
+      })
+    }
+
+    const numericAmount = toNumber(amount)
+
+    if (numericAmount < 0) {
+      return res.status(400).json({
+        error: "El saldo inicial no puede ser negativo",
+      })
+    }
+
+    const balanceDate = new Date(`${date}T00:00:00`)
+
+    const balance = await prisma.houseBalance.upsert({
+      where: {
+        betHouseId_date: {
+          betHouseId: Number(betHouseId),
+          date: balanceDate,
+        },
+      },
+      update: {
+        amount: numericAmount,
+        notes: notes || null,
+      },
+      create: {
+        betHouseId: Number(betHouseId),
+        date: balanceDate,
+        amount: numericAmount,
+        notes: notes || null,
+      },
+      include: {
+        betHouse: true,
+      },
+    })
+
+    res.status(201).json({
+      message: "Saldo inicial guardado correctamente",
+      balance,
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({
+      error: "Error guardando saldo inicial",
+    })
+  }
+})
+
+/* =========================
    CAJA
 ========================= */
 app.get("/api/cash", async (req, res) => {

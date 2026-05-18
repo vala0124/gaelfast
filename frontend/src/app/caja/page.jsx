@@ -33,18 +33,11 @@ import {
   Banknote,
   CalendarDays,
   CreditCard,
+  Landmark,
   ReceiptText,
   Search,
   WalletCards,
 } from "lucide-react"
-
-const banks = [
-  "Coopmego",
-  "Banco Guayaquil",
-  "Pichincha",
-  "JEP",
-  "Produbanco",
-]
 
 function formatMoney(value) {
   const number = Number(value || 0)
@@ -88,6 +81,10 @@ export default function CajaPage() {
 
   const [cashEntries, setCashEntries] = useState([])
   const [withdrawals, setWithdrawals] = useState([])
+  const [banks, setBanks] = useState([])
+  const [betHouses, setBetHouses] = useState([])
+  const [houseBalances, setHouseBalances] = useState([])
+
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -105,17 +102,31 @@ export default function CajaPage() {
     notes: "",
   })
 
+  const [balanceForm, setBalanceForm] = useState({
+    betHouseId: "",
+    date: today,
+    amount: "",
+    notes: "",
+  })
+
   async function loadData() {
     try {
       setLoading(true)
 
-      const [cashRes, withdrawalsRes] = await Promise.all([
-        api.get("/api/cash"),
-        api.get("/api/withdrawals"),
-      ])
+      const [cashRes, withdrawalsRes, banksRes, housesRes, balancesRes] =
+        await Promise.all([
+          api.get("/api/cash"),
+          api.get("/api/withdrawals"),
+          api.get("/api/banks"),
+          api.get("/api/bet-houses"),
+          api.get("/api/house-balances"),
+        ])
 
       setCashEntries(Array.isArray(cashRes.data) ? cashRes.data : [])
       setWithdrawals(Array.isArray(withdrawalsRes.data) ? withdrawalsRes.data : [])
+      setBanks(Array.isArray(banksRes.data) ? banksRes.data : [])
+      setBetHouses(Array.isArray(housesRes.data) ? housesRes.data : [])
+      setHouseBalances(Array.isArray(balancesRes.data) ? balancesRes.data : [])
     } catch (error) {
       console.error(error)
       alert("No se pudieron cargar los datos. Revisa que el backend esté encendido.")
@@ -155,6 +166,53 @@ export default function CajaPage() {
       receiptNumber: "",
       notes: "",
     })
+  }
+
+  function resetBalanceForm() {
+    setBalanceForm({
+      betHouseId: "",
+      date: today,
+      amount: "",
+      notes: "",
+    })
+  }
+
+  async function saveHouseBalance() {
+    try {
+      if (!balanceForm.betHouseId) {
+        alert("Selecciona la casa de apuestas.")
+        return
+      }
+
+      if (!balanceForm.date) {
+        alert("Selecciona la fecha.")
+        return
+      }
+
+      if (balanceForm.amount === "" || Number(balanceForm.amount) < 0) {
+        alert("Ingresa un saldo inicial válido.")
+        return
+      }
+
+      setSaving(true)
+
+      await api.post("/api/house-balances", {
+        betHouseId: Number(balanceForm.betHouseId),
+        date: balanceForm.date,
+        amount: Number(balanceForm.amount),
+        notes: balanceForm.notes,
+      })
+
+      resetBalanceForm()
+      await loadData()
+
+      alert("Saldo inicial guardado correctamente.")
+    } catch (error) {
+      console.error(error)
+      alert(error.response?.data?.error || "Error guardando saldo inicial.")
+    } finally {
+      setSaving(false)
+    }
   }
 
   function validateCashForm() {
@@ -266,6 +324,17 @@ export default function CajaPage() {
     })
   }, [cashEntries, search, startDate, endDate])
 
+  const filteredHouseBalances = useMemo(() => {
+    return houseBalances.filter((item) =>
+      isDateInsideRange(item.date, startDate, endDate)
+    )
+  }, [houseBalances, startDate, endDate])
+
+  const totalInitialBalance = filteredHouseBalances.reduce(
+    (sum, item) => sum + Number(item.amount || 0),
+    0
+  )
+
   const totalReceived = filteredCashEntries.reduce(
     (sum, item) => sum + Number(item.amount || 0),
     0
@@ -299,9 +368,8 @@ export default function CajaPage() {
               </h1>
 
               <p className="mt-2 max-w-2xl text-sm text-white/75">
-                Registra el valor que la casa de apuestas pagó a la tienda para
-                compensar retiros pendientes. Cuando el pago cubre el retiro, la
-                diferencia queda en cero.
+                Registra el saldo inicial por casa y los pagos que las casas de
+                apuestas realizan a la tienda para compensar retiros pendientes.
               </p>
             </div>
 
@@ -311,11 +379,20 @@ export default function CajaPage() {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-4">
+          <Card className="border-white/10 bg-[#0b0b0d] text-white">
+            <CardContent className="p-5">
+              <p className="text-sm text-zinc-400">Saldo inicial casas</p>
+              <p className="mt-2 text-3xl font-bold text-[#ffd400]">
+                {formatMoney(totalInitialBalance)}
+              </p>
+            </CardContent>
+          </Card>
+
           <Card className="border-white/10 bg-[#0b0b0d] text-white">
             <CardContent className="p-5">
               <p className="text-sm text-zinc-400">Pagado por casas</p>
-              <p className="mt-2 text-3xl font-bold text-[#ffd400]">
+              <p className="mt-2 text-3xl font-bold">
                 {formatMoney(totalReceived)}
               </p>
             </CardContent>
@@ -333,12 +410,157 @@ export default function CajaPage() {
           <Card className="border-white/10 bg-[#0b0b0d] text-white">
             <CardContent className="p-5">
               <p className="text-sm text-zinc-400">Pagos registrados</p>
-              <p className="mt-2 text-3xl font-bold">
-                {registeredPayments}
-              </p>
+              <p className="mt-2 text-3xl font-bold">{registeredPayments}</p>
             </CardContent>
           </Card>
         </div>
+
+        <Card className="border-white/10 bg-[#0b0b0d] text-white shadow-2xl">
+          <CardHeader className="border-b border-white/10">
+            <CardTitle className="flex items-center gap-2 text-xl font-bold">
+              <Landmark className="h-5 w-5 text-[#ffd400]" />
+              Saldo inicial por casa
+            </CardTitle>
+
+            <p className="text-sm text-zinc-400">
+              Registra el saldo inicial con el que empieza cada casa de apuestas
+              en el día.
+            </p>
+          </CardHeader>
+
+          <CardContent className="p-6">
+            <div className="grid gap-4 md:grid-cols-4">
+              <div className="space-y-2">
+                <Label className="text-zinc-300">Casa de apuestas</Label>
+                <Select
+                  value={balanceForm.betHouseId}
+                  onValueChange={(value) =>
+                    setBalanceForm({ ...balanceForm, betHouseId: value })
+                  }
+                >
+                  <SelectTrigger className="h-11 border-white/10 bg-black text-white">
+                    <SelectValue placeholder="Selecciona casa" />
+                  </SelectTrigger>
+
+                  <SelectContent className="border-white/10 bg-[#0b0b0d] text-white">
+                    {betHouses.length === 0 ? (
+                      <SelectItem value="SIN_CASAS" disabled>
+                        Sin casas registradas
+                      </SelectItem>
+                    ) : (
+                      betHouses.map((house) => (
+                        <SelectItem key={house.id} value={String(house.id)}>
+                          {house.name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-zinc-300">Fecha</Label>
+                <Input
+                  type="date"
+                  value={balanceForm.date}
+                  onChange={(e) =>
+                    setBalanceForm({ ...balanceForm, date: e.target.value })
+                  }
+                  className="h-11 border-white/10 bg-black text-white"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-zinc-300">Saldo inicial</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={balanceForm.amount}
+                  onChange={(e) =>
+                    setBalanceForm({ ...balanceForm, amount: e.target.value })
+                  }
+                  placeholder="0.00"
+                  className="h-11 border-white/10 bg-black text-white placeholder:text-zinc-600"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-zinc-300">Observación</Label>
+                <Input
+                  value={balanceForm.notes}
+                  onChange={(e) =>
+                    setBalanceForm({ ...balanceForm, notes: e.target.value })
+                  }
+                  placeholder="Opcional"
+                  className="h-11 border-white/10 bg-black text-white placeholder:text-zinc-600"
+                />
+              </div>
+            </div>
+
+            <div className="mt-5 flex justify-end border-t border-white/10 pt-5">
+              <Button
+                type="button"
+                onClick={saveHouseBalance}
+                disabled={saving}
+                className="h-11 w-full bg-[#d90416] px-8 font-semibold text-white hover:bg-[#ff1024] md:w-auto"
+              >
+                Guardar saldo inicial
+              </Button>
+            </div>
+
+            <div className="mt-6 overflow-hidden rounded-2xl border border-white/10">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-white/10 bg-white/[0.03] hover:bg-white/[0.03]">
+                    <TableHead className="text-zinc-400">Fecha</TableHead>
+                    <TableHead className="text-zinc-400">Casa</TableHead>
+                    <TableHead className="text-zinc-400">Observación</TableHead>
+                    <TableHead className="text-right text-zinc-400">
+                      Saldo
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+
+                <TableBody>
+                  {filteredHouseBalances.length === 0 ? (
+                    <TableRow className="border-white/10">
+                      <TableCell
+                        colSpan={4}
+                        className="py-8 text-center text-zinc-400"
+                      >
+                        No hay saldos iniciales registrados para este filtro.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredHouseBalances.map((item) => (
+                      <TableRow
+                        key={item.id}
+                        className="border-white/10 hover:bg-white/[0.03]"
+                      >
+                        <TableCell className="text-zinc-400">
+                          {formatDate(item.date)}
+                        </TableCell>
+
+                        <TableCell className="font-medium text-white">
+                          {item.betHouse?.name || "-"}
+                        </TableCell>
+
+                        <TableCell className="text-zinc-400">
+                          {item.notes || "-"}
+                        </TableCell>
+
+                        <TableCell className="text-right font-bold text-[#ffd400]">
+                          {formatMoney(item.amount)}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
 
         <Card className="border-white/10 bg-[#0b0b0d] text-white shadow-2xl">
           <CardHeader className="border-b border-white/10">
@@ -364,8 +586,9 @@ export default function CajaPage() {
                         ...form,
                         withdrawalId: value,
                         amount:
-                          withdrawals.find((item) => String(item.id) === String(value))
-                            ?.difference || "",
+                          withdrawals.find(
+                            (item) => String(item.id) === String(value)
+                          )?.difference || "",
                       })
                     }
                   >
@@ -381,7 +604,10 @@ export default function CajaPage() {
                       ) : (
                         selectableWithdrawals.map((item) => (
                           <SelectItem key={item.id} value={String(item.id)}>
-                            {item.client?.name || "-"} · {item.betHouse?.name || "-"} · #{item.withdrawalCode || "-"} · {formatMoney(item.difference)}
+                            {item.client?.name || "-"} ·{" "}
+                            {item.betHouse?.name || "-"} · #
+                            {item.withdrawalCode || "-"} ·{" "}
+                            {formatMoney(item.difference)}
                           </SelectItem>
                         ))
                       )}
@@ -494,11 +720,17 @@ export default function CajaPage() {
                       </SelectTrigger>
 
                       <SelectContent className="border-white/10 bg-[#0b0b0d] text-white">
-                        {banks.map((bank) => (
-                          <SelectItem key={bank} value={bank}>
-                            {bank}
+                        {banks.length === 0 ? (
+                          <SelectItem value="SIN_BANCOS" disabled>
+                            Sin bancos registrados
                           </SelectItem>
-                        ))}
+                        ) : (
+                          banks.map((bank) => (
+                            <SelectItem key={bank.id} value={bank.name}>
+                              {bank.name}
+                            </SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -652,7 +884,9 @@ export default function CajaPage() {
                     <TableHead className="text-zinc-400">Casa</TableHead>
                     <TableHead className="text-zinc-400">Método</TableHead>
                     <TableHead className="text-zinc-400">Comprobante</TableHead>
-                    <TableHead className="text-right text-zinc-400">Monto</TableHead>
+                    <TableHead className="text-right text-zinc-400">
+                      Monto
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
 
@@ -688,7 +922,8 @@ export default function CajaPage() {
                         <TableCell>
                           <div>
                             <p className="font-medium text-white">
-                              {item.withdrawal?.client?.name || "Movimiento general"}
+                              {item.withdrawal?.client?.name ||
+                                "Movimiento general"}
                             </p>
                             <p className="text-xs text-zinc-500">
                               #{item.withdrawal?.withdrawalCode || "-"} ·{" "}
