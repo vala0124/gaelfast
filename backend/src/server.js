@@ -841,24 +841,39 @@ app.post("/api/recharges", async (req, res) => {
       }
     }
 
-    const recharge = await prisma.recharge.create({
-      data: {
-        clientId: finalClientId,
-        betHouseId: Number(betHouseId),
-        amount: numericAmount,
-        paymentMethod,
-        receiptNumber: receiptNumber || null,
-        notes:
-          bankName && paymentMethod === "TRANSFERENCIA"
-            ? `Banco: ${bankName}${notes ? ` | ${notes}` : ""}`
-            : notes || null,
-        status: status || "RECARGADO",
-      },
-      include: {
-        client: true,
-        betHouse: true,
-      },
-    })
+            const commissionSetting = await prisma.commissionSetting.findUnique({
+              where: {
+                betHouseId_operationType: {
+                  betHouseId: Number(betHouseId),
+                  operationType: "RECARGA",
+                },
+              },
+            })
+
+            const commission =
+              commissionSetting && commissionSetting.active
+                ? Number(commissionSetting.amount || 0)
+                : 0
+
+            const recharge = await prisma.recharge.create({
+              data: {
+                clientId: finalClientId,
+                betHouseId: Number(betHouseId),
+                amount: numericAmount,
+                commission,
+                paymentMethod,
+                receiptNumber: receiptNumber || null,
+                notes:
+                  bankName && paymentMethod === "TRANSFERENCIA"
+                    ? `Banco: ${bankName}${notes ? ` | ${notes}` : ""}`
+                    : notes || null,
+                status: status || "RECARGADO",
+              },
+              include: {
+                client: true,
+                betHouse: true,
+              },
+            })
 
     res.status(201).json(recharge)
   } catch (error) {
@@ -941,22 +956,38 @@ app.post("/api/withdrawals", async (req, res) => {
       })
     }
 
-    const withdrawal = await prisma.withdrawal.create({
-      data: {
-        clientId: Number(clientId),
-        betHouseId: Number(betHouseId),
-        amount: numericAmount,
-        withdrawalCode: withdrawalCode || null,
-        receiptNumber: receiptNumber || null,
-        paidToClient: Boolean(paidToClient),
-        notes: notes || null,
-        status: status || "PENDIENTE",
-      },
-      include: {
-        client: true,
-        betHouse: true,
-      },
-    })
+
+          const commissionSetting = await prisma.commissionSetting.findUnique({
+            where: {
+              betHouseId_operationType: {
+                betHouseId: Number(betHouseId),
+                operationType: "RETIRO",
+              },
+            },
+          })
+
+          const commission =
+            commissionSetting && commissionSetting.active
+              ? Number(commissionSetting.amount || 0)
+              : 0
+
+          const withdrawal = await prisma.withdrawal.create({
+            data: {
+              clientId: Number(clientId),
+              betHouseId: Number(betHouseId),
+              amount: numericAmount,
+              commission,
+              withdrawalCode: withdrawalCode || null,
+              receiptNumber: receiptNumber || null,
+              paidToClient: Boolean(paidToClient),
+              notes: notes || null,
+              status: status || "PENDIENTE",
+            },
+            include: {
+              client: true,
+              betHouse: true,
+            },
+          })
 
     res.status(201).json(withdrawal)
   } catch (error) {
