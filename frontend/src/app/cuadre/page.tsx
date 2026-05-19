@@ -17,14 +17,17 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import {
+  Building2,
   CalendarDays,
   CheckCircle2,
   ClipboardCheck,
   History,
+  Landmark,
   PiggyBank,
   ReceiptText,
   RefreshCcw,
   Save,
+  Store,
   Wallet,
 } from "lucide-react"
 
@@ -32,6 +35,7 @@ const bankKeys = [
   { key: "cash", label: "Efectivo" },
   { key: "coopmego", label: "Coopmego" },
   { key: "guayaquil", label: "Banco Guayaquil" },
+  { key: "banco_loja", label: "Banco de Loja" },
   { key: "pichincha", label: "Pichincha" },
   { key: "jep", label: "JEP" },
   { key: "produbanco", label: "Produbanco" },
@@ -53,6 +57,17 @@ function formatDate(value) {
     dateStyle: "short",
     timeStyle: "short",
   }).format(new Date(value))
+}
+
+function formatOnlyDate(value) {
+  if (!value) return "-"
+
+  const dateKey = String(value).slice(0, 10)
+  const [year, month, day] = dateKey.split("-")
+
+  return new Intl.DateTimeFormat("es-EC", {
+    dateStyle: "medium",
+  }).format(new Date(Number(year), Number(month) - 1, Number(day)))
 }
 
 function getTodayDate() {
@@ -90,6 +105,7 @@ function normalizeBankKey(bankName) {
   if (!text) return null
   if (text.includes("coopmego")) return "coopmego"
   if (text.includes("guayaquil")) return "guayaquil"
+  if (text.includes("loja")) return "banco_loja"
   if (text.includes("pichincha")) return "pichincha"
   if (text.includes("jep")) return "jep"
   if (text.includes("produbanco")) return "produbanco"
@@ -97,26 +113,14 @@ function normalizeBankKey(bankName) {
   return null
 }
 
-function createEmptyValues() {
-  return {
-    cash: "",
-    coopmego: "",
-    guayaquil: "",
-    pichincha: "",
-    jep: "",
-    produbanco: "",
-  }
-}
+function createEmptyValues(rows = []) {
+  const values = {}
 
-function createEmptyNumbers() {
-  return {
-    cash: 0,
-    coopmego: 0,
-    guayaquil: 0,
-    pichincha: 0,
-    jep: 0,
-    produbanco: 0,
+  for (const row of rows) {
+    values[row.key] = ""
   }
+
+  return values
 }
 
 export default function CuadrePage() {
@@ -126,27 +130,36 @@ export default function CuadrePage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
+  const [dailyCashBox, setDailyCashBox] = useState(null)
+
   const [recharges, setRecharges] = useState([])
   const [withdrawals, setWithdrawals] = useState([])
   const [cashEntries, setCashEntries] = useState([])
   const [productSales, setProductSales] = useState([])
   const [closings, setClosings] = useState([])
 
-  const [realValues, setRealValues] = useState(createEmptyValues())
+  const [realValues, setRealValues] = useState({})
   const [notes, setNotes] = useState("")
 
-  async function loadData() {
+  async function loadData(dateValue = selectedDate) {
     try {
       setLoading(true)
 
-      const [rechargesRes, withdrawalsRes, cashRes, salesRes] =
-        await Promise.all([
-          api.get("/api/recharges"),
-          api.get("/api/withdrawals"),
-          api.get("/api/cash"),
-          api.get("/api/product-sales"),
-        ])
+      const [
+        dailyCashBoxRes,
+        rechargesRes,
+        withdrawalsRes,
+        cashRes,
+        salesRes,
+      ] = await Promise.all([
+        api.get(`/api/daily-cash-box?date=${dateValue}`),
+        api.get("/api/recharges"),
+        api.get("/api/withdrawals"),
+        api.get("/api/cash"),
+        api.get("/api/product-sales"),
+      ])
 
+      setDailyCashBox(dailyCashBoxRes.data || null)
       setRecharges(Array.isArray(rechargesRes.data) ? rechargesRes.data : [])
       setWithdrawals(
         Array.isArray(withdrawalsRes.data) ? withdrawalsRes.data : []
@@ -169,8 +182,9 @@ export default function CuadrePage() {
   }
 
   useEffect(() => {
-    loadData()
-  }, [])
+    loadData(selectedDate)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate])
 
   const dayData = useMemo(() => {
     const dayRecharges = recharges.filter((item) =>
@@ -197,8 +211,107 @@ export default function CuadrePage() {
     }
   }, [recharges, withdrawals, cashEntries, productSales, selectedDate])
 
-  const expectedByAccount = useMemo(() => {
-    const values = createEmptyNumbers()
+  const houseCashBoxes = dailyCashBox?.houseCashBoxes || []
+  const bankCashBoxes = dailyCashBox?.bankCashBoxes || []
+
+  const bankInitialByKey = useMemo(() => {
+    const values = {}
+
+    for (const bank of bankCashBoxes) {
+      const key = normalizeBankKey(bank.bank?.name)
+
+      if (key) {
+        values[key] = Number(bank.initialBalance || 0)
+      }
+    }
+
+    return values
+  }, [bankCashBoxes])
+
+  const houseRows = useMemo(() => {
+    const map = new Map()
+
+    for (const item of houseCashBoxes) {
+      if (!item.betHouseId) continue
+
+      map.set(String(item.betHouseId), {
+        key: `house_${item.betHouseId}`,
+        type: "CASA",
+        label: item.betHouse?.name || `Casa ${item.betHouseId}`,
+        betHouseId: item.betHouseId,
+        initial: Number(item.initialBalance || 0),
+        income: 0,
+        outcome: 0,
+      })
+    }
+
+    for (const recharge of dayData.recharges) {
+      if (recharge.status === "ANULADO") continue
+      if (!recharge.betHouseId) continue
+
+      const id = String(recharge.betHouseId)
+
+      if (!map.has(id)) {
+        map.set(id, {
+          key: `house_${recharge.betHouseId}`,
+          type: "CASA",
+          label: recharge.betHouse?.name || `Casa ${recharge.betHouseId}`,
+          betHouseId: recharge.betHouseId,
+          initial: 0,
+          income: 0,
+          outcome: 0,
+        })
+      }
+
+      const current = map.get(id)
+      current.outcome += Number(recharge.amount || 0)
+    }
+
+    for (const withdrawal of dayData.withdrawals) {
+      if (withdrawal.status === "ANULADO") continue
+      if (!withdrawal.betHouseId) continue
+
+      const id = String(withdrawal.betHouseId)
+
+      if (!map.has(id)) {
+        map.set(id, {
+          key: `house_${withdrawal.betHouseId}`,
+          type: "CASA",
+          label: withdrawal.betHouse?.name || `Casa ${withdrawal.betHouseId}`,
+          betHouseId: withdrawal.betHouseId,
+          initial: 0,
+          income: 0,
+          outcome: 0,
+        })
+      }
+
+      const current = map.get(id)
+      current.income += Number(withdrawal.amount || 0)
+    }
+
+    return Array.from(map.values()).sort((a, b) =>
+      a.label.localeCompare(b.label)
+    )
+  }, [houseCashBoxes, dayData.recharges, dayData.withdrawals])
+
+  const accountRows = useMemo(() => {
+    const rows = bankKeys.map((account) => {
+      const initial =
+        account.key === "cash"
+          ? Number(dailyCashBox?.salesInitialCash || 0)
+          : Number(bankInitialByKey[account.key] || 0)
+
+      return {
+        key: account.key,
+        type: account.key === "cash" ? "EFECTIVO" : "BANCO",
+        label: account.label,
+        initial,
+        income: 0,
+        outcome: 0,
+      }
+    })
+
+    const rowMap = new Map(rows.map((row) => [row.key, row]))
 
     for (const recharge of dayData.recharges) {
       if (recharge.status === "ANULADO") continue
@@ -206,14 +319,16 @@ export default function CuadrePage() {
       const amount = Number(recharge.amount || 0)
 
       if (recharge.paymentMethod === "EFECTIVO") {
-        values.cash += amount
+        rowMap.get("cash").income += amount
         continue
       }
 
       if (recharge.paymentMethod === "TRANSFERENCIA") {
         const bank = normalizeBankKey(getBankFromNotes(recharge.notes))
 
-        if (bank) values[bank] += amount
+        if (bank && rowMap.has(bank)) {
+          rowMap.get(bank).income += amount
+        }
       }
     }
 
@@ -221,14 +336,16 @@ export default function CuadrePage() {
       const amount = Number(entry.amount || 0)
 
       if (entry.paymentMethod === "EFECTIVO") {
-        values.cash += amount
+        rowMap.get("cash").income += amount
         continue
       }
 
       if (entry.paymentMethod === "TRANSFERENCIA") {
         const bank = normalizeBankKey(getBankFromNotes(entry.notes))
 
-        if (bank) values[bank] += amount
+        if (bank && rowMap.has(bank)) {
+          rowMap.get(bank).income += amount
+        }
       }
     }
 
@@ -236,12 +353,49 @@ export default function CuadrePage() {
       const amount = Number(sale.total || 0)
 
       if (sale.paymentMethod === "EFECTIVO") {
-        values.cash += amount
+        rowMap.get("cash").income += amount
+        continue
+      }
+
+      if (sale.paymentMethod === "TRANSFERENCIA") {
+        const bank = normalizeBankKey(
+          sale.bankName || getBankFromNotes(sale.notes)
+        )
+
+        if (bank && rowMap.has(bank)) {
+          rowMap.get(bank).income += amount
+        }
       }
     }
 
-    return values
-  }, [dayData])
+    return rows
+  }, [dailyCashBox, bankInitialByKey, dayData])
+
+  const cuadreRows = useMemo(() => {
+    const bankAndCashRows = accountRows.map((row) => ({
+      ...row,
+      expected: Number(row.initial || 0) + Number(row.income || 0) - Number(row.outcome || 0),
+    }))
+
+    const houses = houseRows.map((row) => ({
+      ...row,
+      expected: Number(row.initial || 0) + Number(row.income || 0) - Number(row.outcome || 0),
+    }))
+
+    return [...bankAndCashRows, ...houses]
+  }, [accountRows, houseRows])
+
+  useEffect(() => {
+    setRealValues((current) => {
+      const next = {}
+
+      for (const row of cuadreRows) {
+        next[row.key] = current[row.key] ?? ""
+      }
+
+      return next
+    })
+  }, [cuadreRows])
 
   const totals = useMemo(() => {
     const totalRecharges = dayData.recharges
@@ -262,13 +416,28 @@ export default function CuadrePage() {
       0
     )
 
-    const expectedTotal = bankKeys.reduce(
-      (sum, item) => sum + Number(expectedByAccount[item.key] || 0),
+    const totalInitial = cuadreRows.reduce(
+      (sum, row) => sum + Number(row.initial || 0),
       0
     )
 
-    const realTotal = bankKeys.reduce(
-      (sum, item) => sum + Number(realValues[item.key] || 0),
+    const totalIncome = cuadreRows.reduce(
+      (sum, row) => sum + Number(row.income || 0),
+      0
+    )
+
+    const totalOutcome = cuadreRows.reduce(
+      (sum, row) => sum + Number(row.outcome || 0),
+      0
+    )
+
+    const expectedTotal = cuadreRows.reduce(
+      (sum, row) => sum + Number(row.expected || 0),
+      0
+    )
+
+    const realTotal = cuadreRows.reduce(
+      (sum, row) => sum + Number(realValues[row.key] || 0),
       0
     )
 
@@ -279,11 +448,14 @@ export default function CuadrePage() {
       totalWithdrawals,
       totalHousePayments,
       totalProductSales,
+      totalInitial,
+      totalIncome,
+      totalOutcome,
       expectedTotal,
       realTotal,
       differenceTotal,
     }
-  }, [dayData, expectedByAccount, realValues])
+  }, [dayData, cuadreRows, realValues])
 
   function updateRealValue(key, value) {
     setRealValues((current) => ({
@@ -293,18 +465,17 @@ export default function CuadrePage() {
   }
 
   function fillExpectedValues() {
-    setRealValues({
-      cash: String(expectedByAccount.cash || ""),
-      coopmego: String(expectedByAccount.coopmego || ""),
-      guayaquil: String(expectedByAccount.guayaquil || ""),
-      pichincha: String(expectedByAccount.pichincha || ""),
-      jep: String(expectedByAccount.jep || ""),
-      produbanco: String(expectedByAccount.produbanco || ""),
-    })
+    const values = {}
+
+    for (const row of cuadreRows) {
+      values[row.key] = String(row.expected || "")
+    }
+
+    setRealValues(values)
   }
 
   function clearRealValues() {
-    setRealValues(createEmptyValues())
+    setRealValues(createEmptyValues(cuadreRows))
     setNotes("")
   }
 
@@ -320,20 +491,19 @@ export default function CuadrePage() {
 
       await api.post("/api/cash-closings", {
         closingDate: selectedDate,
-        expectedValues: expectedByAccount,
+        expectedValues: {
+          rows: cuadreRows,
+        },
         realValues,
         summary: totals,
         notes,
       })
 
-      await loadData()
+      await loadData(selectedDate)
       alert("Cierre de caja guardado correctamente.")
     } catch (error) {
       console.error(error)
-      alert(
-        error.response?.data?.error ||
-          "No se pudo guardar el cierre de caja."
-      )
+      alert(error.response?.data?.error || "No se pudo guardar el cierre de caja.")
     } finally {
       setSaving(false)
     }
@@ -354,9 +524,9 @@ export default function CuadrePage() {
               </h1>
 
               <p className="mt-2 max-w-3xl text-sm text-white/75">
-                Aquí se cruzan recargas, pagos de casas, ventas de productos,
-                efectivo y cuentas bancarias. El sistema calcula lo esperado y
-                tú ingresas lo real para ver diferencias.
+                Aquí se cruzan caja inicial, bancos, casas de apuestas, recargas,
+                retiros, pagos de casas y ventas de productos. El sistema calcula
+                el saldo esperado final y tú ingresas el valor real revisado.
               </p>
             </div>
 
@@ -373,7 +543,7 @@ export default function CuadrePage() {
 
               <Button
                 type="button"
-                onClick={loadData}
+                onClick={() => loadData(selectedDate)}
                 className="h-11 border border-white/10 bg-black font-semibold text-white hover:bg-white/10"
               >
                 <RefreshCcw className="mr-2 h-4 w-4" />
@@ -383,7 +553,14 @@ export default function CuadrePage() {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        {!dailyCashBox && (
+          <div className="rounded-2xl border border-[#ffd400]/20 bg-[#ffd400]/10 p-4 text-sm text-[#ffd400]">
+            No existe apertura de caja para esta fecha. Primero crea la caja
+            diaria en el módulo Caja.
+          </div>
+        )}
+
+        <div className="grid gap-4 md:grid-cols-4">
           <Card className="border-white/10 bg-[#0b0b0d] text-white">
             <CardContent className="p-5">
               <div className="flex items-center justify-between">
@@ -392,6 +569,18 @@ export default function CuadrePage() {
               </div>
               <p className="mt-2 text-3xl font-bold text-[#ffd400]">
                 {formatMoney(totals.totalRecharges)}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-white/10 bg-[#0b0b0d] text-white">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-zinc-400">Retiros</p>
+                <Landmark className="h-5 w-5 text-[#ffd400]" />
+              </div>
+              <p className="mt-2 text-3xl font-bold">
+                {formatMoney(totals.totalWithdrawals)}
               </p>
             </CardContent>
           </Card>
@@ -421,19 +610,45 @@ export default function CuadrePage() {
           </Card>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-4">
           <Card className="border-white/10 bg-[#0b0b0d] text-white">
             <CardContent className="p-5">
-              <p className="text-sm text-zinc-400">Total esperado</p>
-              <p className="mt-2 text-3xl font-bold text-[#ffd400]">
-                {formatMoney(totals.expectedTotal)}
-              </p>
-              <p className="mt-2 text-xs text-zinc-500">
-                Lo que el sistema calcula según movimientos.
+              <p className="text-sm text-zinc-400">Saldo inicial total</p>
+              <p className="mt-2 text-3xl font-bold">
+                {formatMoney(totals.totalInitial)}
               </p>
             </CardContent>
           </Card>
 
+          <Card className="border-white/10 bg-[#0b0b0d] text-white">
+            <CardContent className="p-5">
+              <p className="text-sm text-zinc-400">Entradas del día</p>
+              <p className="mt-2 text-3xl font-bold text-[#ffd400]">
+                {formatMoney(totals.totalIncome)}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-white/10 bg-[#0b0b0d] text-white">
+            <CardContent className="p-5">
+              <p className="text-sm text-zinc-400">Salidas del día</p>
+              <p className="mt-2 text-3xl font-bold">
+                {formatMoney(totals.totalOutcome)}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-white/10 bg-[#0b0b0d] text-white">
+            <CardContent className="p-5">
+              <p className="text-sm text-zinc-400">Esperado final</p>
+              <p className="mt-2 text-3xl font-bold text-[#ffd400]">
+                {formatMoney(totals.expectedTotal)}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
           <Card className="border-white/10 bg-[#0b0b0d] text-white">
             <CardContent className="p-5">
               <p className="text-sm text-zinc-400">Total real ingresado</p>
@@ -441,7 +656,7 @@ export default function CuadrePage() {
                 {formatMoney(totals.realTotal)}
               </p>
               <p className="mt-2 text-xs text-zinc-500">
-                Lo que realmente cuentas en efectivo y bancos.
+                Lo que realmente revisas en caja, bancos y casas.
               </p>
             </CardContent>
           </Card>
@@ -459,7 +674,7 @@ export default function CuadrePage() {
                 {formatMoney(totals.differenceTotal)}
               </p>
               <p className="mt-2 text-xs text-zinc-500">
-                Real ingresado menos total esperado.
+                Real ingresado menos esperado final.
               </p>
             </CardContent>
           </Card>
@@ -469,11 +684,12 @@ export default function CuadrePage() {
           <CardHeader className="border-b border-white/10">
             <CardTitle className="flex items-center gap-2 text-xl font-bold">
               <ClipboardCheck className="h-5 w-5 text-[#ffd400]" />
-              Cuadre por efectivo y cuentas
+              Cuadre por caja, bancos y casas
             </CardTitle>
+
             <p className="text-sm text-zinc-400">
-              El sistema calcula lo esperado. Ingresa lo que realmente existe en
-              efectivo y en cada cuenta bancaria.
+              Inicial + entradas - salidas = esperado final. Ingresa el valor
+              real revisado para ver la diferencia.
             </p>
           </CardHeader>
 
@@ -501,12 +717,22 @@ export default function CuadrePage() {
               <Table>
                 <TableHeader>
                   <TableRow className="border-white/10 bg-white/[0.03] hover:bg-white/[0.03]">
-                    <TableHead className="text-zinc-400">Cuenta</TableHead>
+                    <TableHead className="text-zinc-400">Tipo</TableHead>
+                    <TableHead className="text-zinc-400">Cuenta / casa</TableHead>
                     <TableHead className="text-right text-zinc-400">
-                      Esperado sistema
+                      Inicial
                     </TableHead>
                     <TableHead className="text-right text-zinc-400">
-                      Real contado/revisado
+                      Entradas
+                    </TableHead>
+                    <TableHead className="text-right text-zinc-400">
+                      Salidas
+                    </TableHead>
+                    <TableHead className="text-right text-zinc-400">
+                      Esperado final
+                    </TableHead>
+                    <TableHead className="text-right text-zinc-400">
+                      Real revisado
                     </TableHead>
                     <TableHead className="text-right text-zinc-400">
                       Diferencia
@@ -515,50 +741,96 @@ export default function CuadrePage() {
                 </TableHeader>
 
                 <TableBody>
-                  {bankKeys.map((account) => {
-                    const expected = Number(expectedByAccount[account.key] || 0)
-                    const real = Number(realValues[account.key] || 0)
-                    const difference = real - expected
-
-                    return (
-                      <TableRow
-                        key={account.key}
-                        className="border-white/10 hover:bg-white/[0.03]"
+                  {loading ? (
+                    <TableRow className="border-white/10">
+                      <TableCell
+                        colSpan={8}
+                        className="py-8 text-center text-zinc-400"
                       >
-                        <TableCell className="font-medium text-white">
-                          {account.label}
-                        </TableCell>
+                        Cargando cuadre...
+                      </TableCell>
+                    </TableRow>
+                  ) : cuadreRows.length === 0 ? (
+                    <TableRow className="border-white/10">
+                      <TableCell
+                        colSpan={8}
+                        className="py-10 text-center text-zinc-400"
+                      >
+                        No hay datos para cuadrar en esta fecha.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    cuadreRows.map((row) => {
+                      const expected = Number(row.expected || 0)
+                      const real = Number(realValues[row.key] || 0)
+                      const difference = real - expected
 
-                        <TableCell className="text-right font-bold text-[#ffd400]">
-                          {formatMoney(expected)}
-                        </TableCell>
-
-                        <TableCell className="text-right">
-                          <Input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={realValues[account.key]}
-                            onChange={(e) =>
-                              updateRealValue(account.key, e.target.value)
-                            }
-                            placeholder="0.00"
-                            className="ml-auto h-10 max-w-[160px] border-white/10 bg-black text-right text-white placeholder:text-zinc-600"
-                          />
-                        </TableCell>
-
-                        <TableCell
-                          className={`text-right font-bold ${
-                            difference === 0
-                              ? "text-emerald-300"
-                              : "text-[#ffd400]"
-                          }`}
+                      return (
+                        <TableRow
+                          key={row.key}
+                          className="border-white/10 hover:bg-white/[0.03]"
                         >
-                          {formatMoney(difference)}
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
+                          <TableCell>
+                            <Badge
+                              className={
+                                row.type === "CASA"
+                                  ? "bg-[#ffd400]/15 text-[#ffd400] hover:bg-[#ffd400]/15"
+                                  : row.type === "BANCO"
+                                  ? "bg-blue-500/15 text-blue-300 hover:bg-blue-500/15"
+                                  : "bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/15"
+                              }
+                            >
+                              {row.type}
+                            </Badge>
+                          </TableCell>
+
+                          <TableCell className="font-medium text-white">
+                            {row.label}
+                          </TableCell>
+
+                          <TableCell className="text-right text-zinc-300">
+                            {formatMoney(row.initial)}
+                          </TableCell>
+
+                          <TableCell className="text-right text-emerald-300">
+                            {formatMoney(row.income)}
+                          </TableCell>
+
+                          <TableCell className="text-right text-red-300">
+                            {formatMoney(row.outcome)}
+                          </TableCell>
+
+                          <TableCell className="text-right font-bold text-[#ffd400]">
+                            {formatMoney(expected)}
+                          </TableCell>
+
+                          <TableCell className="text-right">
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={realValues[row.key] || ""}
+                              onChange={(e) =>
+                                updateRealValue(row.key, e.target.value)
+                              }
+                              placeholder="0.00"
+                              className="ml-auto h-10 max-w-[150px] border-white/10 bg-black text-right text-white placeholder:text-zinc-600"
+                            />
+                          </TableCell>
+
+                          <TableCell
+                            className={`text-right font-bold ${
+                              difference === 0
+                                ? "text-emerald-300"
+                                : "text-[#ffd400]"
+                            }`}
+                          >
+                            {formatMoney(difference)}
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })
+                  )}
                 </TableBody>
               </Table>
             </div>
@@ -595,6 +867,7 @@ export default function CuadrePage() {
               <History className="h-5 w-5 text-[#ffd400]" />
               Historial de cierres
             </CardTitle>
+
             <p className="text-sm text-zinc-400">
               Aquí aparecerán los días en los que se guardó el cierre de caja.
             </p>
@@ -646,7 +919,7 @@ export default function CuadrePage() {
                         className="border-white/10 hover:bg-white/[0.03]"
                       >
                         <TableCell className="font-medium text-white">
-                          {closing.closingDate?.slice(0, 10)}
+                          {formatOnlyDate(closing.closingDate)}
                         </TableCell>
 
                         <TableCell className="text-right text-[#ffd400]">
