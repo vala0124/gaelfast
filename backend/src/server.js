@@ -920,6 +920,10 @@ app.post("/api/withdrawals", async (req, res) => {
   try {
     const {
       clientId,
+      clientName,
+      clientCedula,
+      clientEmail,
+      clientPhone,
       betHouseId,
       amount,
       withdrawalCode,
@@ -929,9 +933,9 @@ app.post("/api/withdrawals", async (req, res) => {
       status,
     } = req.body
 
-    if (!clientId || !betHouseId || !amount) {
+    if (!betHouseId || !amount) {
       return res.status(400).json({
-        error: "Cliente, casa de apuestas y monto son obligatorios",
+        error: "Casa de apuestas y monto son obligatorios",
       })
     }
 
@@ -943,30 +947,75 @@ app.post("/api/withdrawals", async (req, res) => {
       })
     }
 
+    let finalClientId = clientId ? Number(clientId) : null
 
+    if (!finalClientId) {
+      if (!clientName || !clientCedula) {
+        return res.status(400).json({
+          error: "Nombre y cédula/ID del cliente son obligatorios",
+        })
+      }
 
+      const normalizedCedula = String(clientCedula).trim()
+      const normalizedName = String(clientName).trim()
 
-          const withdrawal = await prisma.withdrawal.create({
-            data: {
-              clientId: Number(clientId),
-              betHouseId: Number(betHouseId),
-              amount: numericAmount,
-              commission: 0,
-              withdrawalCode: withdrawalCode || null,
-              receiptNumber: receiptNumber || null,
-              paidToClient: Boolean(paidToClient),
-              notes: notes || null,
-              status: status || "PENDIENTE",
-            },
-            include: {
-              client: true,
-              betHouse: true,
-            },
-          })
+      const existingClient = await prisma.client.findUnique({
+        where: { cedula: normalizedCedula },
+      })
+
+      if (existingClient) {
+        finalClientId = existingClient.id
+
+        await prisma.client.update({
+          where: { id: existingClient.id },
+          data: {
+            name: normalizedName || existingClient.name,
+            email: clientEmail || existingClient.email,
+            phone: clientPhone || existingClient.phone,
+          },
+        })
+      } else {
+        const newClient = await prisma.client.create({
+          data: {
+            cedula: normalizedCedula,
+            name: normalizedName,
+            email: clientEmail || null,
+            phone: clientPhone || null,
+          },
+        })
+
+        finalClientId = newClient.id
+      }
+    }
+
+    const withdrawal = await prisma.withdrawal.create({
+      data: {
+        clientId: finalClientId,
+        betHouseId: Number(betHouseId),
+        amount: numericAmount,
+        commission: 0,
+        withdrawalCode: withdrawalCode || null,
+        receiptNumber: receiptNumber || null,
+        paidToClient: Boolean(paidToClient),
+        notes: notes || null,
+        status: status || "PENDIENTE",
+      },
+      include: {
+        client: true,
+        betHouse: true,
+      },
+    })
 
     res.status(201).json(withdrawal)
   } catch (error) {
     console.error(error)
+
+    if (error.code === "P2002") {
+      return res.status(400).json({
+        error: "Ya existe un cliente con esa cédula/ID",
+      })
+    }
+
     res.status(500).json({
       error: "Error creando retiro",
     })

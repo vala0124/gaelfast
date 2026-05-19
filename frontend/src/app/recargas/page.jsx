@@ -200,11 +200,6 @@ export default function RecargasPage() {
       return false
     }
 
-    if (!form.clientPhone.trim()) {
-      alert("Ingresa el celular del cliente.")
-      return false
-    }
-
     if (!form.betHouseId) {
       alert("Selecciona la casa de apuestas.")
       return false

@@ -187,8 +187,6 @@ export default function RetirosPage() {
       ...form,
       clientId: "",
       clientCedula: value,
-      clientName: "",
-      clientPhone: "",
     })
   }
 
@@ -219,8 +217,8 @@ export default function RetirosPage() {
       return false
     }
 
-    if (!form.clientId) {
-      alert("Cliente no encontrado. Primero debe existir en el sistema mediante una recarga.")
+    if (!form.clientName.trim()) {
+      alert("Ingresa el nombre del cliente.")
       return false
     }
 
@@ -255,7 +253,10 @@ export default function RetirosPage() {
       setSaving(true)
 
       await api.post("/api/withdrawals", {
-        clientId: Number(form.clientId),
+        clientId: form.clientId ? Number(form.clientId) : null,
+        clientName: form.clientName,
+        clientCedula: form.clientCedula,
+        clientPhone: form.clientPhone,
         betHouseId: Number(form.betHouseId),
         amount: Number(form.amount),
         withdrawalCode: form.withdrawalCode,
@@ -593,8 +594,10 @@ export default function RetirosPage() {
                 <Label className="text-zinc-300">Nombre</Label>
                 <Input
                   value={form.clientName}
-                  readOnly
-                  placeholder="Cliente"
+                  onChange={(e) =>
+                    setForm({ ...form, clientName: e.target.value })
+                  }
+                  placeholder="Nombre del cliente"
                   className="h-11 border-white/10 bg-black text-white placeholder:text-zinc-600"
                 />
               </div>
@@ -603,8 +606,10 @@ export default function RetirosPage() {
                 <Label className="text-zinc-300">Celular</Label>
                 <Input
                   value={form.clientPhone}
-                  readOnly
-                  placeholder="Celular"
+                  onChange={(e) =>
+                    setForm({ ...form, clientPhone: e.target.value })
+                  }
+                  placeholder="Celular opcional"
                   className="h-11 border-white/10 bg-black text-white placeholder:text-zinc-600"
                 />
               </div>
@@ -612,8 +617,7 @@ export default function RetirosPage() {
 
             {!form.clientId && form.clientCedula.trim() && (
               <div className="rounded-2xl border border-[#ffd400]/20 bg-[#ffd400]/10 p-4 text-sm text-[#ffd400]">
-                Cliente no encontrado. Para registrar un retiro, primero debe
-                existir en el sistema.
+                Cliente nuevo: se creará automáticamente al registrar el retiro.
               </div>
             )}
 
