@@ -1145,6 +1145,49 @@ app.get("/api/daily-cash-box", async (req, res) => {
   }
 })
 
+app.get("/api/daily-cash-box/history", async (req, res) => {
+  try {
+    const cashBoxes = await prisma.dailyCashBox.findMany({
+      orderBy: {
+        date: "desc",
+      },
+      include: {
+        houseCashBoxes: {
+          include: {
+            betHouse: true,
+          },
+          orderBy: {
+            betHouse: {
+              name: "asc",
+            },
+          },
+        },
+      },
+    })
+
+    const formatted = cashBoxes.map((cashBox) => {
+      const totalHouseInitialBalance = cashBox.houseCashBoxes.reduce(
+        (sum, item) => sum + Number(item.initialBalance || 0),
+        0
+      )
+
+      return {
+        ...cashBox,
+        totalHouseInitialBalance,
+        housesCount: cashBox.houseCashBoxes.length,
+      }
+    })
+
+    res.json(formatted)
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({
+      error: "Error obteniendo historial de cajas diarias",
+    })
+  }
+})
+
+
 app.post("/api/daily-cash-box", async (req, res) => {
   try {
     const { date, salesInitialCash, notes } = req.body

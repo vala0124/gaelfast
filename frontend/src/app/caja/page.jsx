@@ -58,11 +58,17 @@ function getTodayDate() {
   return `${year}-${month}-${day}`
 }
 
+function getDateKey(value) {
+  if (!value) return ""
+  return String(value).slice(0, 10)
+}
+
 export default function CajaPage() {
   const today = getTodayDate()
 
   const [betHouses, setBetHouses] = useState([])
   const [dailyCashBox, setDailyCashBox] = useState(null)
+  const [dailyCashBoxHistory, setDailyCashBoxHistory] = useState([])
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -84,16 +90,19 @@ export default function CajaPage() {
     try {
       setLoading(true)
 
-      const [housesRes, cashBoxRes] = await Promise.all([
+      const [housesRes, cashBoxRes, historyRes] = await Promise.all([
         api.get("/api/bet-houses"),
         api.get(`/api/daily-cash-box?date=${dateValue}`),
+        api.get("/api/daily-cash-box/history"),
       ])
 
       const housesData = Array.isArray(housesRes.data) ? housesRes.data : []
       const cashBoxData = cashBoxRes.data || null
+      const historyData = Array.isArray(historyRes.data) ? historyRes.data : []
 
       setBetHouses(housesData)
       setDailyCashBox(cashBoxData)
+      setDailyCashBoxHistory(historyData)
 
       setCashBoxForm({
         salesInitialCash:
@@ -214,6 +223,10 @@ export default function CajaPage() {
     setSelectedDate(today)
   }
 
+  function openHistoryDate(dateValue) {
+    setSelectedDate(getDateKey(dateValue))
+  }
+
   const houseCashBoxes = dailyCashBox?.houseCashBoxes || []
 
   const totalHouseInitialBalance = useMemo(() => {
@@ -274,6 +287,7 @@ export default function CajaPage() {
                   <CalendarDays className="h-5 w-5 text-[#ffd400]" />
                   Fecha de caja
                 </CardTitle>
+
                 <p className="mt-1 text-sm text-zinc-400">
                   Selecciona la fecha para crear o consultar la apertura de caja.
                 </p>
@@ -531,8 +545,7 @@ export default function CajaPage() {
                 </CardTitle>
 
                 <p className="mt-1 text-sm text-zinc-400">
-                  Historial de saldos iniciales guardados para la fecha
-                  seleccionada.
+                  Saldos iniciales guardados para la fecha seleccionada.
                 </p>
               </div>
 
@@ -662,6 +675,115 @@ export default function CajaPage() {
                   </p>
                 </div>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-white/10 bg-[#0b0b0d] text-white shadow-2xl">
+          <CardHeader className="border-b border-white/10">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <CardTitle className="text-xl font-bold">
+                  Historial de cajas iniciales diarias
+                </CardTitle>
+
+                <p className="mt-1 text-sm text-zinc-400">
+                  Consulta las aperturas de caja registradas por día.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-black px-4 py-2 text-sm text-zinc-400">
+                Jornadas registradas:{" "}
+                <span className="font-bold text-[#ffd400]">
+                  {dailyCashBoxHistory.length}
+                </span>
+              </div>
+            </div>
+          </CardHeader>
+
+          <CardContent className="p-6">
+            <div className="overflow-hidden rounded-2xl border border-white/10">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-white/10 bg-white/[0.03] hover:bg-white/[0.03]">
+                    <TableHead className="text-zinc-400">Fecha</TableHead>
+                    <TableHead className="text-zinc-400">
+                      Caja ventas
+                    </TableHead>
+                    <TableHead className="text-zinc-400">
+                      Casas registradas
+                    </TableHead>
+                    <TableHead className="text-zinc-400">
+                      Saldo casas
+                    </TableHead>
+                    <TableHead className="text-zinc-400">Observación</TableHead>
+                    <TableHead className="text-right text-zinc-400">
+                      Acción
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+
+                <TableBody>
+                  {loading ? (
+                    <TableRow className="border-white/10">
+                      <TableCell
+                        colSpan={6}
+                        className="py-8 text-center text-zinc-400"
+                      >
+                        Cargando historial...
+                      </TableCell>
+                    </TableRow>
+                  ) : dailyCashBoxHistory.length === 0 ? (
+                    <TableRow className="border-white/10">
+                      <TableCell
+                        colSpan={6}
+                        className="py-10 text-center text-zinc-400"
+                      >
+                        Todavía no hay cajas diarias registradas.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    dailyCashBoxHistory.map((item) => (
+                      <TableRow
+                        key={item.id}
+                        className="border-white/10 hover:bg-white/[0.03]"
+                      >
+                        <TableCell className="text-zinc-400">
+                          {formatDate(item.date)}
+                        </TableCell>
+
+                        <TableCell className="font-bold text-[#ffd400]">
+                          {formatMoney(item.salesInitialCash)}
+                        </TableCell>
+
+                        <TableCell>
+                          <Badge className="bg-white/10 text-zinc-300 hover:bg-white/10">
+                            {item.housesCount || 0} casas
+                          </Badge>
+                        </TableCell>
+
+                        <TableCell className="font-bold text-white">
+                          {formatMoney(item.totalHouseInitialBalance)}
+                        </TableCell>
+
+                        <TableCell className="text-zinc-400">
+                          {item.notes || "-"}
+                        </TableCell>
+
+                        <TableCell className="text-right">
+                          <Button
+                            type="button"
+                            onClick={() => openHistoryDate(item.date)}
+                            className="h-9 border border-white/10 bg-black px-4 text-sm font-semibold text-white hover:bg-white/10"
+                          >
+                            Ver
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
             </div>
           </CardContent>
         </Card>
