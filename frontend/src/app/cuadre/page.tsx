@@ -20,124 +20,24 @@ import {
   CalendarDays,
   CheckCircle2,
   ClipboardCheck,
-  DollarSign,
   History,
   PiggyBank,
   ReceiptText,
   RefreshCcw,
   Save,
-  TrendingUp,
   Wallet,
 } from "lucide-react"
 
-type Client = {
-  id: number
-  name: string
-  cedula: string
-  phone?: string | null
-}
-
-type BetHouse = {
-  id: number
-  name: string
-}
-
-type Recharge = {
-  id: number
-  amount: number
-  paymentMethod: string
-  receiptNumber?: string | null
-  notes?: string | null
-  status: string
-  createdAt: string
-  client?: Client
-  betHouse?: BetHouse
-}
-
-type Withdrawal = {
-  id: number
-  amount: number
-  paidByHouse?: number
-  difference?: number
-  status: string
-  createdAt: string
-  withdrawalCode?: string | null
-  client?: Client
-  betHouse?: BetHouse
-}
-
-type CashEntry = {
-  id: number
-  amount: number
-  paymentMethod?: string | null
-  receiptNumber?: string | null
-  notes?: string | null
-  type: string
-  createdAt: string
-  withdrawalId?: number | null
-  withdrawal?: Withdrawal
-  betHouse?: BetHouse
-}
-
-type Product = {
-  id: number
-  name: string
-  purchasePrice: number
-  salePrice: number
-}
-
-type ProductSale = {
-  id: number
-  quantity: number
-  unitPrice: number
-  total: number
-  paymentMethod: string
-  createdAt: string
-  product?: Product
-}
-
-type CashClosing = {
-  id: number
-  closingDate: string
-  expectedTotal: number
-  realTotal: number
-  differenceTotal: number
-  notes?: string | null
-  createdAt: string
-}
-
 const bankKeys = [
-  {
-    key: "cash",
-    label: "Efectivo",
-  },
-  {
-    key: "coopmego",
-    label: "Coopmego",
-  },
-  {
-    key: "guayaquil",
-    label: "Banco Guayaquil",
-  },
-  {
-    key: "pichincha",
-    label: "Pichincha",
-  },
-  {
-    key: "jep",
-    label: "JEP",
-  },
-  {
-    key: "produbanco",
-    label: "Produbanco",
-  },
-] as const
+  { key: "cash", label: "Efectivo" },
+  { key: "coopmego", label: "Coopmego" },
+  { key: "guayaquil", label: "Banco Guayaquil" },
+  { key: "pichincha", label: "Pichincha" },
+  { key: "jep", label: "JEP" },
+  { key: "produbanco", label: "Produbanco" },
+]
 
-type BankKey = (typeof bankKeys)[number]["key"]
-
-type ValuesByAccount = Record<BankKey, string>
-
-function formatMoney(value: number | string | null | undefined) {
+function formatMoney(value) {
   const number = Number(value || 0)
 
   return new Intl.NumberFormat("es-EC", {
@@ -146,7 +46,7 @@ function formatMoney(value: number | string | null | undefined) {
   }).format(number)
 }
 
-function formatDate(value: string | null | undefined) {
+function formatDate(value) {
   if (!value) return "-"
 
   return new Intl.DateTimeFormat("es-EC", {
@@ -164,7 +64,7 @@ function getTodayDate() {
   return `${year}-${month}-${day}`
 }
 
-function isDateInsideRange(dateValue: string, selectedDate: string) {
+function isDateInsideRange(dateValue, selectedDate) {
   if (!dateValue) return false
 
   const itemDate = new Date(dateValue)
@@ -174,7 +74,7 @@ function isDateInsideRange(dateValue: string, selectedDate: string) {
   return itemDate >= start && itemDate <= end
 }
 
-function getBankFromNotes(notes?: string | null) {
+function getBankFromNotes(notes) {
   if (!notes) return ""
 
   const match = String(notes).match(/Banco:\s*([^|]+)/i)
@@ -184,7 +84,7 @@ function getBankFromNotes(notes?: string | null) {
   return match[1].trim()
 }
 
-function normalizeBankKey(bankName?: string | null): BankKey | null {
+function normalizeBankKey(bankName) {
   const text = String(bankName || "").toLowerCase().trim()
 
   if (!text) return null
@@ -197,7 +97,7 @@ function normalizeBankKey(bankName?: string | null): BankKey | null {
   return null
 }
 
-function createEmptyValues(): ValuesByAccount {
+function createEmptyValues() {
   return {
     cash: "",
     coopmego: "",
@@ -208,7 +108,7 @@ function createEmptyValues(): ValuesByAccount {
   }
 }
 
-function createEmptyNumbers(): Record<BankKey, number> {
+function createEmptyNumbers() {
   return {
     cash: 0,
     coopmego: 0,
@@ -226,16 +126,13 @@ export default function CuadrePage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
-  const [recharges, setRecharges] = useState<Recharge[]>([])
-  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([])
-  const [cashEntries, setCashEntries] = useState<CashEntry[]>([])
-  const [productSales, setProductSales] = useState<ProductSale[]>([])
-  const [closings, setClosings] = useState<CashClosing[]>([])
+  const [recharges, setRecharges] = useState([])
+  const [withdrawals, setWithdrawals] = useState([])
+  const [cashEntries, setCashEntries] = useState([])
+  const [productSales, setProductSales] = useState([])
+  const [closings, setClosings] = useState([])
 
-  const [realValues, setRealValues] = useState<ValuesByAccount>(
-    createEmptyValues()
-  )
-
+  const [realValues, setRealValues] = useState(createEmptyValues())
   const [notes, setNotes] = useState("")
 
   async function loadData() {
@@ -365,14 +262,6 @@ export default function CuadrePage() {
       0
     )
 
-    const productProfit = dayData.productSales.reduce((sum, sale) => {
-      const purchasePrice = Number(sale.product?.purchasePrice || 0)
-      const unitPrice = Number(sale.unitPrice || 0)
-      const quantity = Number(sale.quantity || 0)
-
-      return sum + (unitPrice - purchasePrice) * quantity
-    }, 0)
-
     const expectedTotal = bankKeys.reduce(
       (sum, item) => sum + Number(expectedByAccount[item.key] || 0),
       0
@@ -385,24 +274,18 @@ export default function CuadrePage() {
 
     const differenceTotal = realTotal - expectedTotal
 
-    const pendingWithdrawals = withdrawals
-      .filter((item) => item.status !== "COMPENSADO" && item.status !== "ANULADO")
-      .reduce((sum, item) => sum + Number(item.difference || 0), 0)
-
     return {
       totalRecharges,
       totalWithdrawals,
       totalHousePayments,
       totalProductSales,
-      productProfit,
       expectedTotal,
       realTotal,
       differenceTotal,
-      pendingWithdrawals,
     }
-  }, [dayData, expectedByAccount, realValues, withdrawals])
+  }, [dayData, expectedByAccount, realValues])
 
-  function updateRealValue(key: BankKey, value: string) {
+  function updateRealValue(key, value) {
     setRealValues((current) => ({
       ...current,
       [key]: value,
@@ -445,11 +328,11 @@ export default function CuadrePage() {
 
       await loadData()
       alert("Cierre de caja guardado correctamente.")
-    } catch (error: any) {
+    } catch (error) {
       console.error(error)
       alert(
         error.response?.data?.error ||
-          "No se pudo guardar el cierre. Falta crear el endpoint /api/cash-closings en el backend."
+          "No se pudo guardar el cierre de caja."
       )
     } finally {
       setSaving(false)
@@ -500,7 +383,7 @@ export default function CuadrePage() {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-3">
           <Card className="border-white/10 bg-[#0b0b0d] text-white">
             <CardContent className="p-5">
               <div className="flex items-center justify-between">
@@ -536,18 +419,6 @@ export default function CuadrePage() {
               </p>
             </CardContent>
           </Card>
-
-          <Card className="border-white/10 bg-[#0b0b0d] text-white">
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-zinc-400">Ganancia productos</p>
-                <TrendingUp className="h-5 w-5 text-[#ffd400]" />
-              </div>
-              <p className="mt-2 text-3xl font-bold text-[#ffd400]">
-                {formatMoney(totals.productProfit)}
-              </p>
-            </CardContent>
-          </Card>
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
@@ -557,6 +428,9 @@ export default function CuadrePage() {
               <p className="mt-2 text-3xl font-bold text-[#ffd400]">
                 {formatMoney(totals.expectedTotal)}
               </p>
+              <p className="mt-2 text-xs text-zinc-500">
+                Lo que el sistema calcula según movimientos.
+              </p>
             </CardContent>
           </Card>
 
@@ -565,6 +439,9 @@ export default function CuadrePage() {
               <p className="text-sm text-zinc-400">Total real ingresado</p>
               <p className="mt-2 text-3xl font-bold">
                 {formatMoney(totals.realTotal)}
+              </p>
+              <p className="mt-2 text-xs text-zinc-500">
+                Lo que realmente cuentas en efectivo y bancos.
               </p>
             </CardContent>
           </Card>
@@ -580,6 +457,9 @@ export default function CuadrePage() {
                 }`}
               >
                 {formatMoney(totals.differenceTotal)}
+              </p>
+              <p className="mt-2 text-xs text-zinc-500">
+                Real ingresado menos total esperado.
               </p>
             </CardContent>
           </Card>
