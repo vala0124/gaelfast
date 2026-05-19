@@ -9,6 +9,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
   Table,
   TableBody,
   TableCell,
@@ -141,6 +147,9 @@ export default function CuadrePage() {
   const [realValues, setRealValues] = useState({})
   const [notes, setNotes] = useState("")
 
+  const [selectedClosing, setSelectedClosing] = useState(null)
+  const [closingDetailOpen, setClosingDetailOpen] = useState(false)
+
   async function loadData(dateValue = selectedDate) {
     try {
       setLoading(true)
@@ -185,6 +194,33 @@ export default function CuadrePage() {
     loadData(selectedDate)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate])
+
+  function openClosingDetail(closing) {
+    setSelectedClosing(closing)
+    setClosingDetailOpen(true)
+  }
+
+  function getClosingRows(closing) {
+    if (!closing?.expectedValues) return []
+
+    if (Array.isArray(closing.expectedValues?.rows)) {
+      return closing.expectedValues.rows
+    }
+
+    return bankKeys.map((account) => ({
+      key: account.key,
+      type: account.key === "cash" ? "EFECTIVO" : "BANCO",
+      label: account.label,
+      initial: 0,
+      income: Number(closing.expectedValues?.[account.key] || 0),
+      outcome: 0,
+      expected: Number(closing.expectedValues?.[account.key] || 0),
+    }))
+  }
+
+  function getClosingRealValue(closing, key) {
+    return Number(closing?.realValues?.[key] || 0)
+  }
 
   const dayData = useMemo(() => {
     const dayRecharges = recharges.filter((item) =>
@@ -374,12 +410,18 @@ export default function CuadrePage() {
   const cuadreRows = useMemo(() => {
     const bankAndCashRows = accountRows.map((row) => ({
       ...row,
-      expected: Number(row.initial || 0) + Number(row.income || 0) - Number(row.outcome || 0),
+      expected:
+        Number(row.initial || 0) +
+        Number(row.income || 0) -
+        Number(row.outcome || 0),
     }))
 
     const houses = houseRows.map((row) => ({
       ...row,
-      expected: Number(row.initial || 0) + Number(row.income || 0) - Number(row.outcome || 0),
+      expected:
+        Number(row.initial || 0) +
+        Number(row.income || 0) -
+        Number(row.outcome || 0),
     }))
 
     return [...bankAndCashRows, ...houses]
@@ -890,6 +932,9 @@ export default function CuadrePage() {
                     </TableHead>
                     <TableHead className="text-zinc-400">Observación</TableHead>
                     <TableHead className="text-zinc-400">Guardado</TableHead>
+                    <TableHead className="text-right text-zinc-400">
+                      Acción
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
 
@@ -897,7 +942,7 @@ export default function CuadrePage() {
                   {loading ? (
                     <TableRow className="border-white/10">
                       <TableCell
-                        colSpan={6}
+                        colSpan={7}
                         className="py-8 text-center text-zinc-400"
                       >
                         Cargando cierres...
@@ -906,7 +951,7 @@ export default function CuadrePage() {
                   ) : closings.length === 0 ? (
                     <TableRow className="border-white/10">
                       <TableCell
-                        colSpan={6}
+                        colSpan={7}
                         className="py-10 text-center text-zinc-400"
                       >
                         Aún no hay cierres guardados.
@@ -949,6 +994,16 @@ export default function CuadrePage() {
                         <TableCell className="text-zinc-500">
                           {formatDate(closing.createdAt)}
                         </TableCell>
+
+                        <TableCell className="text-right">
+                          <Button
+                            type="button"
+                            onClick={() => openClosingDetail(closing)}
+                            className="h-9 border border-white/10 bg-black px-4 text-sm font-semibold text-white hover:bg-white/10"
+                          >
+                            Ver
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))
                   )}
@@ -958,6 +1013,186 @@ export default function CuadrePage() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={closingDetailOpen} onOpenChange={setClosingDetailOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto border-white/10 bg-[#0b0b0d] text-white sm:max-w-6xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold">
+              Detalle del cierre
+            </DialogTitle>
+
+            <p className="text-sm text-zinc-400">
+              {selectedClosing
+                ? `Cierre de ${formatOnlyDate(selectedClosing.closingDate)}`
+                : "Detalle del cierre seleccionado"}
+            </p>
+          </DialogHeader>
+
+          {selectedClosing && (
+            <div className="space-y-5">
+              <div className="grid gap-4 md:grid-cols-3">
+                <Card className="border-white/10 bg-black text-white">
+                  <CardContent className="p-5">
+                    <p className="text-sm text-zinc-400">Esperado</p>
+                    <p className="mt-2 text-3xl font-bold text-[#ffd400]">
+                      {formatMoney(selectedClosing.expectedTotal)}
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-white/10 bg-black text-white">
+                  <CardContent className="p-5">
+                    <p className="text-sm text-zinc-400">Real</p>
+                    <p className="mt-2 text-3xl font-bold">
+                      {formatMoney(selectedClosing.realTotal)}
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-white/10 bg-black text-white">
+                  <CardContent className="p-5">
+                    <p className="text-sm text-zinc-400">Diferencia</p>
+                    <p
+                      className={`mt-2 text-3xl font-bold ${
+                        Number(selectedClosing.differenceTotal || 0) === 0
+                          ? "text-emerald-300"
+                          : "text-[#ffd400]"
+                      }`}
+                    >
+                      {formatMoney(selectedClosing.differenceTotal)}
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-black p-4">
+                <p className="text-sm text-zinc-500">Observación</p>
+                <p className="mt-1 font-medium text-white">
+                  {selectedClosing.notes || "-"}
+                </p>
+              </div>
+
+              <div className="overflow-hidden rounded-2xl border border-white/10">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-white/10 bg-white/[0.03] hover:bg-white/[0.03]">
+                      <TableHead className="text-zinc-400">Tipo</TableHead>
+                      <TableHead className="text-zinc-400">
+                        Cuenta / casa
+                      </TableHead>
+                      <TableHead className="text-right text-zinc-400">
+                        Inicial
+                      </TableHead>
+                      <TableHead className="text-right text-zinc-400">
+                        Entradas
+                      </TableHead>
+                      <TableHead className="text-right text-zinc-400">
+                        Salidas
+                      </TableHead>
+                      <TableHead className="text-right text-zinc-400">
+                        Esperado
+                      </TableHead>
+                      <TableHead className="text-right text-zinc-400">
+                        Real
+                      </TableHead>
+                      <TableHead className="text-right text-zinc-400">
+                        Diferencia
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+
+                  <TableBody>
+                    {getClosingRows(selectedClosing).length === 0 ? (
+                      <TableRow className="border-white/10">
+                        <TableCell
+                          colSpan={8}
+                          className="py-8 text-center text-zinc-400"
+                        >
+                          Este cierre no tiene detalle guardado.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      getClosingRows(selectedClosing).map((row) => {
+                        const expected = Number(row.expected || 0)
+                        const real = getClosingRealValue(
+                          selectedClosing,
+                          row.key
+                        )
+                        const difference = real - expected
+
+                        return (
+                          <TableRow
+                            key={row.key}
+                            className="border-white/10 hover:bg-white/[0.03]"
+                          >
+                            <TableCell>
+                              <Badge
+                                className={
+                                  row.type === "CASA"
+                                    ? "bg-[#ffd400]/15 text-[#ffd400] hover:bg-[#ffd400]/15"
+                                    : row.type === "BANCO"
+                                    ? "bg-blue-500/15 text-blue-300 hover:bg-blue-500/15"
+                                    : "bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/15"
+                                }
+                              >
+                                {row.type}
+                              </Badge>
+                            </TableCell>
+
+                            <TableCell className="font-medium text-white">
+                              {row.label}
+                            </TableCell>
+
+                            <TableCell className="text-right text-zinc-300">
+                              {formatMoney(row.initial)}
+                            </TableCell>
+
+                            <TableCell className="text-right text-emerald-300">
+                              {formatMoney(row.income)}
+                            </TableCell>
+
+                            <TableCell className="text-right text-red-300">
+                              {formatMoney(row.outcome)}
+                            </TableCell>
+
+                            <TableCell className="text-right font-bold text-[#ffd400]">
+                              {formatMoney(expected)}
+                            </TableCell>
+
+                            <TableCell className="text-right font-bold text-white">
+                              {formatMoney(real)}
+                            </TableCell>
+
+                            <TableCell
+                              className={`text-right font-bold ${
+                                difference === 0
+                                  ? "text-emerald-300"
+                                  : "text-[#ffd400]"
+                              }`}
+                            >
+                              {formatMoney(difference)}
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  onClick={() => setClosingDetailOpen(false)}
+                  className="border border-white/10 bg-black font-semibold text-white hover:bg-white/10"
+                >
+                  Cerrar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </AppShell>
   )
 }
