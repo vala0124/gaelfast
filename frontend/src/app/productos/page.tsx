@@ -31,7 +31,6 @@ import {
   PlusCircle,
   RefreshCcw,
   Search,
-  TrendingUp,
 } from "lucide-react"
 
 type Product = {
@@ -354,19 +353,9 @@ export default function ProductosPage() {
       0
     )
 
-    const inventorySale = products.reduce(
-      (sum, product) =>
-        sum + Number(product.stock || 0) * Number(product.salePrice || 0),
-      0
-    )
-
-    const projectedProfit = inventorySale - inventoryCost
-
     return {
       totalStock,
       inventoryCost,
-      inventorySale,
-      projectedProfit,
     }
   }, [products])
 
@@ -396,7 +385,7 @@ export default function ProductosPage() {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-3">
           <Card className="border-white/10 bg-[#0b0b0d] text-white">
             <CardContent className="p-5">
               <div className="flex items-center justify-between">
@@ -422,18 +411,6 @@ export default function ProductosPage() {
               <p className="text-sm text-zinc-400">Inventario costo</p>
               <p className="mt-2 text-3xl font-bold">
                 {formatMoney(totals.inventoryCost)}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-white/10 bg-[#0b0b0d] text-white">
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-zinc-400">Ganancia proyectada</p>
-                <TrendingUp className="h-5 w-5 text-[#ffd400]" />
-              </div>
-              <p className="mt-2 text-3xl font-bold text-[#ffd400]">
-                {formatMoney(totals.projectedProfit)}
               </p>
             </CardContent>
           </Card>
@@ -758,8 +735,7 @@ export default function ProductosPage() {
                 </CardTitle>
 
                 <p className="mt-1 text-sm text-zinc-400">
-                  Productos registrados por categoría, código de barra, stock y
-                  margen de ganancia.
+                  Productos registrados por categoría, código de barra, precio y stock.
                 </p>
               </div>
 
@@ -824,9 +800,6 @@ export default function ProductosPage() {
                       Venta
                     </TableHead>
                     <TableHead className="text-right text-zinc-400">
-                      Ganancia/u
-                    </TableHead>
-                    <TableHead className="text-right text-zinc-400">
                       Stock
                     </TableHead>
                   </TableRow>
@@ -836,7 +809,7 @@ export default function ProductosPage() {
                   {loading ? (
                     <TableRow className="border-white/10">
                       <TableCell
-                        colSpan={7}
+                        colSpan={6}
                         className="py-8 text-center text-zinc-400"
                       >
                         Cargando productos...
@@ -845,65 +818,55 @@ export default function ProductosPage() {
                   ) : filteredProducts.length === 0 ? (
                     <TableRow className="border-white/10">
                       <TableCell
-                        colSpan={7}
+                        colSpan={6}
                         className="py-10 text-center text-zinc-400"
                       >
                         No hay productos registrados.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredProducts.map((product) => {
-                      const profit =
-                        Number(product.salePrice || 0) -
-                        Number(product.purchasePrice || 0)
+                    filteredProducts.map((product) => (
+                      <TableRow
+                        key={product.id}
+                        className="border-white/10 hover:bg-white/[0.03]"
+                      >
+                        <TableCell className="font-medium text-white">
+                          {product.name}
+                        </TableCell>
 
-                      return (
-                        <TableRow
-                          key={product.id}
-                          className="border-white/10 hover:bg-white/[0.03]"
-                        >
-                          <TableCell className="font-medium text-white">
-                            {product.name}
-                          </TableCell>
+                        <TableCell className="text-zinc-400">
+                          {product.barcode || "-"}
+                        </TableCell>
 
-                          <TableCell className="text-zinc-400">
-                            {product.barcode || "-"}
-                          </TableCell>
+                        <TableCell>
+                          <Badge className="bg-[#ffd400]/15 text-[#ffd400] hover:bg-[#ffd400]/15">
+                            {product.category || "-"}
+                          </Badge>
+                        </TableCell>
 
-                          <TableCell>
-                            <Badge className="bg-[#ffd400]/15 text-[#ffd400] hover:bg-[#ffd400]/15">
-                              {product.category || "-"}
-                            </Badge>
-                          </TableCell>
+                        <TableCell className="text-right text-zinc-400">
+                          {formatMoney(product.purchasePrice)}
+                        </TableCell>
 
-                          <TableCell className="text-right text-zinc-400">
-                            {formatMoney(product.purchasePrice)}
-                          </TableCell>
+                        <TableCell className="text-right font-bold text-white">
+                          {formatMoney(product.salePrice)}
+                        </TableCell>
 
-                          <TableCell className="text-right font-bold text-white">
-                            {formatMoney(product.salePrice)}
-                          </TableCell>
-
-                          <TableCell className="text-right font-bold text-emerald-300">
-                            {formatMoney(profit)}
-                          </TableCell>
-
-                          <TableCell className="text-right">
-                            <Badge
-                              className={
-                                Number(product.stock || 0) <= 0
-                                  ? "bg-red-500/15 text-red-300 hover:bg-red-500/15"
-                                  : Number(product.stock || 0) <= 5
-                                  ? "bg-[#ffd400]/15 text-[#ffd400] hover:bg-[#ffd400]/15"
-                                  : "bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/15"
-                              }
-                            >
-                              {product.stock}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })
+                        <TableCell className="text-right">
+                          <Badge
+                            className={
+                              Number(product.stock || 0) <= 0
+                                ? "bg-red-500/15 text-red-300 hover:bg-red-500/15"
+                                : Number(product.stock || 0) <= 5
+                                ? "bg-[#ffd400]/15 text-[#ffd400] hover:bg-[#ffd400]/15"
+                                : "bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/15"
+                            }
+                          >
+                            {product.stock}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))
                   )}
                 </TableBody>
               </Table>
