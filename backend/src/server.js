@@ -1676,11 +1676,31 @@ app.get("/api/product-sales", async (req, res) => {
 
 app.post("/api/product-sales", async (req, res) => {
   try {
-    const { productId, quantity, paymentMethod, unitPrice } = req.body
+    const {
+      productId,
+      quantity,
+      paymentMethod,
+      unitPrice,
+      bankName,
+      receiptNumber,
+      notes,
+    } = req.body
 
     if (!productId || !quantity || !paymentMethod) {
       return res.status(400).json({
         error: "Producto, cantidad y método de pago son obligatorios",
+      })
+    }
+
+    if (paymentMethod === "TRANSFERENCIA" && !bankName) {
+      return res.status(400).json({
+        error: "Selecciona el banco de la transferencia",
+      })
+    }
+
+    if (paymentMethod === "TRANSFERENCIA" && !receiptNumber) {
+      return res.status(400).json({
+        error: "Ingresa el número de comprobante",
       })
     }
 
@@ -1728,6 +1748,10 @@ app.post("/api/product-sales", async (req, res) => {
         unitPrice: finalUnitPrice,
         total,
         paymentMethod,
+        bankName: paymentMethod === "TRANSFERENCIA" ? bankName || null : null,
+        receiptNumber:
+          paymentMethod === "TRANSFERENCIA" ? receiptNumber || null : null,
+        notes: notes || null,
       },
       include: {
         product: true,

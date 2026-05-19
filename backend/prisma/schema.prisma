@@ -149,6 +149,9 @@ model ProductSale {
   unitPrice     Float
   total         Float
   paymentMethod String
+  bankName      String?
+  receiptNumber String?
+  notes         String?
   createdAt     DateTime @default(now())
 
   product Product @relation(fields: [productId], references: [id])
