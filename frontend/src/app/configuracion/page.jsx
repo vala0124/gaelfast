@@ -102,21 +102,11 @@ export default function ConfiguracionPage() {
   }, [])
 
   const totals = useMemo(() => {
-    const rechargeTotal = commissionSettings
-      .filter((item) => item.operationType === "RECARGA" && item.active)
-      .reduce((sum, item) => sum + Number(item.amount || 0), 0)
-
-    const withdrawalTotal = commissionSettings
-      .filter((item) => item.operationType === "RETIRO" && item.active)
-      .reduce((sum, item) => sum + Number(item.amount || 0), 0)
-
     return {
-      rechargeTotal,
-      withdrawalTotal,
       houses: betHouses.length,
       banks: banks.length,
     }
-  }, [commissionSettings, betHouses, banks])
+  }, [betHouses, banks])
 
   function updateCommissionField(houseId, field, value) {
     setCommissionForm((prev) => ({
@@ -264,41 +254,23 @@ export default function ConfiguracionPage() {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card className="border-white/10 bg-[#0b0b0d] text-white">
-            <CardContent className="p-5">
-              <p className="text-sm text-zinc-400">Casas activas</p>
-              <p className="mt-2 text-3xl font-bold text-[#ffd400]">
-                {totals.houses}
-              </p>
-            </CardContent>
-          </Card>
+        <div className="grid gap-4 md:grid-cols-2">
+  <Card className="border-white/10 bg-[#0b0b0d] text-white">
+    <CardContent className="p-5">
+      <p className="text-sm text-zinc-400">Casas activas</p>
+      <p className="mt-2 text-3xl font-bold text-[#ffd400]">
+        {totals.houses}
+      </p>
+    </CardContent>
+  </Card>
 
-          <Card className="border-white/10 bg-[#0b0b0d] text-white">
-            <CardContent className="p-5">
-              <p className="text-sm text-zinc-400">Bancos activos</p>
-              <p className="mt-2 text-3xl font-bold">{totals.banks}</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-white/10 bg-[#0b0b0d] text-white">
-            <CardContent className="p-5">
-              <p className="text-sm text-zinc-400">Comisión recarga total</p>
-              <p className="mt-2 text-3xl font-bold">
-                {formatMoney(totals.rechargeTotal)}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-white/10 bg-[#0b0b0d] text-white">
-            <CardContent className="p-5">
-              <p className="text-sm text-zinc-400">Comisión retiro total</p>
-              <p className="mt-2 text-3xl font-bold">
-                {formatMoney(totals.withdrawalTotal)}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+  <Card className="border-white/10 bg-[#0b0b0d] text-white">
+    <CardContent className="p-5">
+      <p className="text-sm text-zinc-400">Bancos activos</p>
+      <p className="mt-2 text-3xl font-bold">{totals.banks}</p>
+    </CardContent>
+  </Card>
+</div>
 
         <Card className="border-white/10 bg-[#0b0b0d] text-white shadow-2xl">
           <CardHeader className="border-b border-white/10">
