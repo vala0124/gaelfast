@@ -507,55 +507,91 @@ export default function CajaPage() {
           </Card>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {banks.map((bank) => {
-            const balance = bankCashBoxes.find(
-              (item) => String(item.bankId) === String(bank.id)
-            )
+        <Card className="border-white/10 bg-[#0b0b0d] text-white shadow-2xl">
+          <CardHeader className="border-b border-white/10">
+            <CardTitle className="flex items-center gap-2 text-xl font-bold">
+              <Building2 className="h-5 w-5 text-[#ffd400]" />
+              Saldos iniciales de bancos
+            </CardTitle>
 
-            return (
-              <Card
-                key={bank.id}
-                className="border-white/10 bg-[#0b0b0d] text-white"
-              >
-                <CardContent className="p-5">
-                  <p className="text-sm text-zinc-400">{bank.name}</p>
-                  <p className="mt-2 text-2xl font-bold text-[#ffd400]">
-                    {formatMoney(balance?.initialBalance)}
-                  </p>
-                  <p className="mt-1 text-xs text-zinc-500">
-                    Saldo inicial banco
-                  </p>
-                </CardContent>
-              </Card>
-            )
-          })}
-        </div>
+            <p className="text-sm text-zinc-400">
+              Dinero inicial registrado en cada cuenta bancaria al iniciar la
+              jornada.
+            </p>
+          </CardHeader>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {betHouses.map((house) => {
-            const balance = houseCashBoxes.find(
-              (item) => String(item.betHouseId) === String(house.id)
-            )
+          <CardContent className="p-6">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {banks.map((bank) => {
+                const balance = bankCashBoxes.find(
+                  (item) => String(item.bankId) === String(bank.id)
+                )
 
-            return (
-              <Card
-                key={house.id}
-                className="border-white/10 bg-[#0b0b0d] text-white"
-              >
-                <CardContent className="p-5">
-                  <p className="text-sm text-zinc-400">{house.name}</p>
-                  <p className="mt-2 text-2xl font-bold text-[#ffd400]">
-                    {formatMoney(balance?.initialBalance)}
-                  </p>
-                  <p className="mt-1 text-xs text-zinc-500">
-                    Saldo inicial casa
-                  </p>
-                </CardContent>
-              </Card>
-            )
-          })}
-        </div>
+                return (
+                  <Card
+                    key={bank.id}
+                    className="border-white/10 bg-black text-white"
+                  >
+                    <CardContent className="p-5">
+                      <p className="text-sm text-zinc-400">{bank.name}</p>
+
+                      <p className="mt-2 text-2xl font-bold text-[#ffd400]">
+                        {formatMoney(balance?.initialBalance)}
+                      </p>
+
+                      <p className="mt-1 text-xs text-zinc-500">
+                        Saldo inicial banco
+                      </p>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-white/10 bg-[#0b0b0d] text-white shadow-2xl">
+          <CardHeader className="border-b border-white/10">
+            <CardTitle className="flex items-center gap-2 text-xl font-bold">
+              <Landmark className="h-5 w-5 text-[#ffd400]" />
+              Saldos iniciales de casas
+            </CardTitle>
+
+            <p className="text-sm text-zinc-400">
+              Saldo inicial registrado para cada casa de apuestas al iniciar la
+              jornada.
+            </p>
+          </CardHeader>
+
+          <CardContent className="p-6">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {betHouses.map((house) => {
+                const balance = houseCashBoxes.find(
+                  (item) => String(item.betHouseId) === String(house.id)
+                )
+
+                return (
+                  <Card
+                    key={house.id}
+                    className="border-white/10 bg-black text-white"
+                  >
+                    <CardContent className="p-5">
+                      <p className="text-sm text-zinc-400">{house.name}</p>
+
+                      <p className="mt-2 text-2xl font-bold text-[#ffd400]">
+                        {formatMoney(balance?.initialBalance)}
+                      </p>
+
+                      <p className="mt-1 text-xs text-zinc-500">
+                        Saldo inicial casa
+                      </p>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
 
         <Card className="border-white/10 bg-[#0b0b0d] text-white shadow-2xl">
           <CardHeader className="border-b border-white/10">
@@ -627,7 +663,7 @@ export default function CajaPage() {
           <CardHeader className="border-b border-white/10">
             <CardTitle className="flex items-center gap-2 text-xl font-bold">
               <Building2 className="h-5 w-5 text-[#ffd400]" />
-              Saldos iniciales de bancos
+              Registrar saldo inicial de banco
             </CardTitle>
 
             <p className="text-sm text-zinc-400">
@@ -724,7 +760,7 @@ export default function CajaPage() {
           <CardHeader className="border-b border-white/10">
             <CardTitle className="flex items-center gap-2 text-xl font-bold">
               <Landmark className="h-5 w-5 text-[#ffd400]" />
-              Saldos iniciales por casa
+              Registrar saldo inicial de casa
             </CardTitle>
 
             <p className="text-sm text-zinc-400">
