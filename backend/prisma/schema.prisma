@@ -50,6 +50,7 @@ model BetHouse {
   cashEntries        CashEntry[]
   houseBalances      HouseBalance[]
   commissionSettings CommissionSetting[]
+  houseCashBoxes     HouseCashBox[]
 }
 
 model CommissionSetting {
@@ -189,4 +190,36 @@ model HouseBalance {
   betHouse BetHouse @relation(fields: [betHouseId], references: [id])
 
   @@unique([betHouseId, date])
+}
+
+model DailyCashBox {
+  id               Int      @id @default(autoincrement())
+  date             DateTime @unique
+  salesInitialCash Float    @default(0)
+  notes            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  houseCashBoxes HouseCashBox[]
+}
+
+model HouseCashBox {
+  id               Int      @id @default(autoincrement())
+  dailyCashBoxId   Int
+  betHouseId       Int
+
+  initialBalance   Float    @default(0)
+  rechargeAmount   Float    @default(0)
+  rechargeProfit   Float    @default(0)
+  withdrawalAmount Float    @default(0)
+  withdrawalProfit Float    @default(0)
+
+  notes            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  dailyCashBox DailyCashBox @relation(fields: [dailyCashBoxId], references: [id])
+  betHouse     BetHouse     @relation(fields: [betHouseId], references: [id])
+
+  @@unique([dailyCashBoxId, betHouseId])
 }

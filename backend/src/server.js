@@ -841,28 +841,13 @@ app.post("/api/recharges", async (req, res) => {
       }
     }
 
-            const commissionSetting = await prisma.commissionSetting.findUnique({
-              where: {
-                betHouseId_operationType: {
-                  betHouseId: Number(betHouseId),
-                  operationType: "RECARGA",
-                },
-              },
-            })
-
-            const commissionPercent =
-              commissionSetting && commissionSetting.active
-                ? Number(commissionSetting.amount || 0)
-                : 0
-
-            const commission = (numericAmount * commissionPercent) / 100
 
             const recharge = await prisma.recharge.create({
               data: {
                 clientId: finalClientId,
                 betHouseId: Number(betHouseId),
                 amount: numericAmount,
-                commission,
+                commission: 0,
                 paymentMethod,
                 receiptNumber: receiptNumber || null,
                 notes:
@@ -959,28 +944,14 @@ app.post("/api/withdrawals", async (req, res) => {
     }
 
 
-          const commissionSetting = await prisma.commissionSetting.findUnique({
-            where: {
-              betHouseId_operationType: {
-                betHouseId: Number(betHouseId),
-                operationType: "RETIRO",
-              },
-            },
-          })
 
-          const commissionPercent =
-            commissionSetting && commissionSetting.active
-              ? Number(commissionSetting.amount || 0)
-              : 0
-
-          const commission = (numericAmount * commissionPercent) / 100
 
           const withdrawal = await prisma.withdrawal.create({
             data: {
               clientId: Number(clientId),
               betHouseId: Number(betHouseId),
               amount: numericAmount,
-              commission,
+              commission: 0,
               withdrawalCode: withdrawalCode || null,
               receiptNumber: receiptNumber || null,
               paidToClient: Boolean(paidToClient),
@@ -1075,6 +1046,197 @@ app.post("/api/house-balances", async (req, res) => {
     console.error(error)
     res.status(500).json({
       error: "Error guardando saldo inicial",
+    })
+  }
+})
+
+/* =========================
+   CAJA DIARIA / JORNADA
+========================= */
+app.get("/api/daily-cash-box", async (req, res) => {
+  try {
+    const { date } = req.query
+
+    if (!date) {
+      return res.status(400).json({
+        error: "La fecha es obligatoria",
+      })
+    }
+
+    const cashBoxDate = new Date(`${date}T00:00:00`)
+
+    const cashBox = await prisma.dailyCashBox.findUnique({
+      where: {
+        date: cashBoxDate,
+      },
+      include: {
+        houseCashBoxes: {
+          orderBy: {
+            betHouse: {
+              name: "asc",
+            },
+          },
+          include: {
+            betHouse: true,
+          },
+        },
+      },
+    })
+
+    if (!cashBox) {
+      return res.json(null)
+    }
+
+    res.json(cashBox)
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({
+      error: "Error obteniendo caja diaria",
+    })
+  }
+})
+
+app.post("/api/daily-cash-box", async (req, res) => {
+  try {
+    const { date, salesInitialCash, notes } = req.body
+
+    if (!date) {
+      return res.status(400).json({
+        error: "La fecha es obligatoria",
+      })
+    }
+
+    const cashBoxDate = new Date(`${date}T00:00:00`)
+    const numericSalesInitialCash = toNumber(salesInitialCash)
+
+    if (numericSalesInitialCash < 0) {
+      return res.status(400).json({
+        error: "El saldo inicial de ventas no puede ser negativo",
+      })
+    }
+
+    const cashBox = await prisma.dailyCashBox.upsert({
+      where: {
+        date: cashBoxDate,
+      },
+      update: {
+        salesInitialCash: numericSalesInitialCash,
+        notes: notes || null,
+      },
+      create: {
+        date: cashBoxDate,
+        salesInitialCash: numericSalesInitialCash,
+        notes: notes || null,
+      },
+      include: {
+        houseCashBoxes: {
+          include: {
+            betHouse: true,
+          },
+        },
+      },
+    })
+
+    res.status(201).json({
+      message: "Caja diaria guardada correctamente",
+      cashBox,
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({
+      error: "Error guardando caja diaria",
+    })
+  }
+})
+
+app.post("/api/daily-cash-box/house", async (req, res) => {
+  try {
+    const {
+      date,
+      betHouseId,
+      initialBalance,
+      rechargeAmount,
+      rechargeProfit,
+      withdrawalAmount,
+      withdrawalProfit,
+      notes,
+    } = req.body
+
+    if (!date || !betHouseId) {
+      return res.status(400).json({
+        error: "Fecha y casa de apuestas son obligatorias",
+      })
+    }
+
+    const cashBoxDate = new Date(`${date}T00:00:00`)
+
+    const cashBox = await prisma.dailyCashBox.upsert({
+      where: {
+        date: cashBoxDate,
+      },
+      update: {},
+      create: {
+        date: cashBoxDate,
+        salesInitialCash: 0,
+      },
+    })
+
+    const numericInitialBalance = toNumber(initialBalance)
+    const numericRechargeAmount = toNumber(rechargeAmount)
+    const numericRechargeProfit = toNumber(rechargeProfit)
+    const numericWithdrawalAmount = toNumber(withdrawalAmount)
+    const numericWithdrawalProfit = toNumber(withdrawalProfit)
+
+    if (
+      numericInitialBalance < 0 ||
+      numericRechargeAmount < 0 ||
+      numericRechargeProfit < 0 ||
+      numericWithdrawalAmount < 0 ||
+      numericWithdrawalProfit < 0
+    ) {
+      return res.status(400).json({
+        error: "Los valores no pueden ser negativos",
+      })
+    }
+
+    const houseCashBox = await prisma.houseCashBox.upsert({
+      where: {
+        dailyCashBoxId_betHouseId: {
+          dailyCashBoxId: cashBox.id,
+          betHouseId: Number(betHouseId),
+        },
+      },
+      update: {
+        initialBalance: numericInitialBalance,
+        rechargeAmount: numericRechargeAmount,
+        rechargeProfit: numericRechargeProfit,
+        withdrawalAmount: numericWithdrawalAmount,
+        withdrawalProfit: numericWithdrawalProfit,
+        notes: notes || null,
+      },
+      create: {
+        dailyCashBoxId: cashBox.id,
+        betHouseId: Number(betHouseId),
+        initialBalance: numericInitialBalance,
+        rechargeAmount: numericRechargeAmount,
+        rechargeProfit: numericRechargeProfit,
+        withdrawalAmount: numericWithdrawalAmount,
+        withdrawalProfit: numericWithdrawalProfit,
+        notes: notes || null,
+      },
+      include: {
+        betHouse: true,
+      },
+    })
+
+    res.status(201).json({
+      message: "Caja por casa guardada correctamente",
+      houseCashBox,
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({
+      error: "Error guardando caja por casa",
     })
   }
 })
