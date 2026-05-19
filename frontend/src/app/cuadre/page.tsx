@@ -1016,7 +1016,7 @@ export default function CuadrePage() {
 
       <Dialog open={closingDetailOpen} onOpenChange={setClosingDetailOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto border-white/10 bg-[#0b0b0d] text-white sm:max-w-6xl">
-          <DialogHeader>
+          <DialogHeader className="space-y-2">
             <DialogTitle className="text-2xl font-bold">
               Detalle del cierre
             </DialogTitle>
