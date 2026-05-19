@@ -1099,9 +1099,6 @@ app.post("/api/house-balances", async (req, res) => {
   }
 })
 
-/* =========================
-   CAJA DIARIA / JORNADA
-========================= */
 app.get("/api/daily-cash-box", async (req, res) => {
   try {
     const { date } = req.query
@@ -1127,6 +1124,16 @@ app.get("/api/daily-cash-box", async (req, res) => {
           },
           include: {
             betHouse: true,
+          },
+        },
+        bankCashBoxes: {
+          orderBy: {
+            bank: {
+              name: "asc",
+            },
+          },
+          include: {
+            bank: true,
           },
         },
       },
@@ -1162,6 +1169,16 @@ app.get("/api/daily-cash-box/history", async (req, res) => {
             },
           },
         },
+        bankCashBoxes: {
+          include: {
+            bank: true,
+          },
+          orderBy: {
+            bank: {
+              name: "asc",
+            },
+          },
+        },
       },
     })
 
@@ -1171,10 +1188,17 @@ app.get("/api/daily-cash-box/history", async (req, res) => {
         0
       )
 
+      const totalBankInitialBalance = cashBox.bankCashBoxes.reduce(
+        (sum, item) => sum + Number(item.initialBalance || 0),
+        0
+      )
+
       return {
         ...cashBox,
         totalHouseInitialBalance,
+        totalBankInitialBalance,
         housesCount: cashBox.houseCashBoxes.length,
+        banksCount: cashBox.bankCashBoxes.length,
       }
     })
 
@@ -1329,6 +1353,71 @@ app.post("/api/daily-cash-box/house", async (req, res) => {
     console.error(error)
     res.status(500).json({
       error: "Error guardando caja por casa",
+    })
+  }
+})
+
+app.post("/api/daily-cash-box/bank", async (req, res) => {
+  try {
+    const { date, bankId, initialBalance, notes } = req.body
+
+    if (!date || !bankId) {
+      return res.status(400).json({
+        error: "Fecha y banco son obligatorios",
+      })
+    }
+
+    const cashBoxDate = new Date(`${date}T00:00:00`)
+
+    const cashBox = await prisma.dailyCashBox.upsert({
+      where: {
+        date: cashBoxDate,
+      },
+      update: {},
+      create: {
+        date: cashBoxDate,
+        salesInitialCash: 0,
+      },
+    })
+
+    const numericInitialBalance = toNumber(initialBalance)
+
+    if (numericInitialBalance < 0) {
+      return res.status(400).json({
+        error: "El saldo inicial del banco no puede ser negativo",
+      })
+    }
+
+    const bankCashBox = await prisma.bankCashBox.upsert({
+      where: {
+        dailyCashBoxId_bankId: {
+          dailyCashBoxId: cashBox.id,
+          bankId: Number(bankId),
+        },
+      },
+      update: {
+        initialBalance: numericInitialBalance,
+        notes: notes || null,
+      },
+      create: {
+        dailyCashBoxId: cashBox.id,
+        bankId: Number(bankId),
+        initialBalance: numericInitialBalance,
+        notes: notes || null,
+      },
+      include: {
+        bank: true,
+      },
+    })
+
+    res.status(201).json({
+      message: "Caja por banco guardada correctamente",
+      bankCashBox,
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({
+      error: "Error guardando caja por banco",
     })
   }
 })

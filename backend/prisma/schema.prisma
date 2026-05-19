@@ -179,6 +179,8 @@ model Bank {
   notes     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  bankCashBoxes BankCashBox[]
 }
 
 model HouseBalance {
@@ -204,25 +206,43 @@ model DailyCashBox {
   updatedAt        DateTime @updatedAt
 
   houseCashBoxes HouseCashBox[]
+  bankCashBoxes  BankCashBox[]
 }
 
 model HouseCashBox {
-  id               Int      @id @default(autoincrement())
-  dailyCashBoxId   Int
-  betHouseId       Int
+  id             Int @id @default(autoincrement())
+  dailyCashBoxId Int
+  betHouseId     Int
 
-  initialBalance   Float    @default(0)
-  rechargeAmount   Float    @default(0)
-  rechargeProfit   Float    @default(0)
-  withdrawalAmount Float    @default(0)
-  withdrawalProfit Float    @default(0)
+  initialBalance   Float @default(0)
+  rechargeAmount   Float @default(0)
+  rechargeProfit   Float @default(0)
+  withdrawalAmount Float @default(0)
+  withdrawalProfit Float @default(0)
 
-  notes            String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   dailyCashBox DailyCashBox @relation(fields: [dailyCashBoxId], references: [id])
   betHouse     BetHouse     @relation(fields: [betHouseId], references: [id])
 
   @@unique([dailyCashBoxId, betHouseId])
+}
+
+model BankCashBox {
+  id             Int @id @default(autoincrement())
+  dailyCashBoxId Int
+  bankId         Int
+
+  initialBalance Float @default(0)
+
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  dailyCashBox DailyCashBox @relation(fields: [dailyCashBoxId], references: [id])
+  bank         Bank         @relation(fields: [bankId], references: [id])
+
+  @@unique([dailyCashBoxId, bankId])
 }

@@ -16,12 +16,6 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import {
   Table,
   TableBody,
   TableCell,
@@ -30,14 +24,11 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import {
-  Banknote,
+  Building2,
   CalendarDays,
-  CreditCard,
   Landmark,
-  ReceiptText,
   RefreshCcw,
   Save,
-  Search,
   Store,
   WalletCards,
 } from "lucide-react"
@@ -54,21 +45,12 @@ function formatMoney(value) {
 function formatDate(value) {
   if (!value) return "-"
 
-  const text = String(value)
-
-  if (text.includes("T00:00:00.000Z")) {
-    const dateKey = text.slice(0, 10)
-    const [year, month, day] = dateKey.split("-")
-
-    return new Intl.DateTimeFormat("es-EC", {
-      dateStyle: "medium",
-    }).format(new Date(Number(year), Number(month) - 1, Number(day)))
-  }
+  const dateKey = String(value).slice(0, 10)
+  const [year, month, day] = dateKey.split("-")
 
   return new Intl.DateTimeFormat("es-EC", {
-    dateStyle: "short",
-    timeStyle: "short",
-  }).format(new Date(value))
+    dateStyle: "medium",
+  }).format(new Date(Number(year), Number(month) - 1, Number(day)))
 }
 
 function getTodayDate() {
@@ -85,16 +67,6 @@ function getDateKey(value) {
   return String(value).slice(0, 10)
 }
 
-function isDateInsideRange(dateValue, selectedDate) {
-  if (!dateValue) return false
-
-  const itemDate = new Date(dateValue)
-  const start = new Date(`${selectedDate}T00:00:00`)
-  const end = new Date(`${selectedDate}T23:59:59`)
-
-  return itemDate >= start && itemDate <= end
-}
-
 export default function CajaPage() {
   const today = getTodayDate()
 
@@ -103,15 +75,10 @@ export default function CajaPage() {
   const [dailyCashBox, setDailyCashBox] = useState(null)
   const [dailyCashBoxHistory, setDailyCashBoxHistory] = useState([])
 
-  const [withdrawals, setWithdrawals] = useState([])
-  const [cashEntries, setCashEntries] = useState([])
-
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
   const [selectedDate, setSelectedDate] = useState(today)
-  const [search, setSearch] = useState("")
-  const [confirmOpen, setConfirmOpen] = useState(false)
 
   const [cashBoxForm, setCashBoxForm] = useState({
     salesInitialCash: "",
@@ -124,12 +91,9 @@ export default function CajaPage() {
     notes: "",
   })
 
-  const [paymentForm, setPaymentForm] = useState({
-    withdrawalId: "",
-    amount: "",
-    paymentMethod: "TRANSFERENCIA",
-    bankName: "",
-    receiptNumber: "",
+  const [bankForm, setBankForm] = useState({
+    bankId: "",
+    initialBalance: "",
     notes: "",
   })
 
@@ -137,39 +101,22 @@ export default function CajaPage() {
     try {
       setLoading(true)
 
-      const [
-        housesRes,
-        banksRes,
-        cashBoxRes,
-        historyRes,
-        withdrawalsRes,
-        cashEntriesRes,
-      ] = await Promise.all([
+      const [housesRes, banksRes, cashBoxRes, historyRes] = await Promise.all([
         api.get("/api/bet-houses"),
         api.get("/api/banks"),
         api.get(`/api/daily-cash-box?date=${dateValue}`),
         api.get("/api/daily-cash-box/history"),
-        api.get("/api/withdrawals"),
-        api.get("/api/cash"),
       ])
 
       const housesData = Array.isArray(housesRes.data) ? housesRes.data : []
       const banksData = Array.isArray(banksRes.data) ? banksRes.data : []
       const cashBoxData = cashBoxRes.data || null
       const historyData = Array.isArray(historyRes.data) ? historyRes.data : []
-      const withdrawalsData = Array.isArray(withdrawalsRes.data)
-        ? withdrawalsRes.data
-        : []
-      const cashEntriesData = Array.isArray(cashEntriesRes.data)
-        ? cashEntriesRes.data
-        : []
 
       setBetHouses(housesData)
       setBanks(banksData)
       setDailyCashBox(cashBoxData)
       setDailyCashBoxHistory(historyData)
-      setWithdrawals(withdrawalsData)
-      setCashEntries(cashEntriesData)
 
       setCashBoxForm({
         salesInitialCash:
@@ -213,13 +160,10 @@ export default function CajaPage() {
     })
   }
 
-  function resetPaymentForm() {
-    setPaymentForm({
-      withdrawalId: "",
-      amount: "",
-      paymentMethod: "TRANSFERENCIA",
-      bankName: "",
-      receiptNumber: "",
+  function resetBankForm() {
+    setBankForm({
+      bankId: "",
+      initialBalance: "",
       notes: "",
     })
   }
@@ -302,6 +246,47 @@ export default function CajaPage() {
     }
   }
 
+  async function saveBankCashBox() {
+    try {
+      if (!selectedDate) {
+        alert("Selecciona la fecha.")
+        return
+      }
+
+      if (!bankForm.bankId) {
+        alert("Selecciona el banco o cuenta.")
+        return
+      }
+
+      if (
+        bankForm.initialBalance === "" ||
+        Number(bankForm.initialBalance) < 0
+      ) {
+        alert("Ingresa un saldo inicial válido para el banco.")
+        return
+      }
+
+      setSaving(true)
+
+      await api.post("/api/daily-cash-box/bank", {
+        date: selectedDate,
+        bankId: Number(bankForm.bankId),
+        initialBalance: Number(bankForm.initialBalance),
+        notes: bankForm.notes,
+      })
+
+      resetBankForm()
+      await loadData(selectedDate)
+
+      alert("Saldo inicial por banco guardado correctamente.")
+    } catch (error) {
+      console.error(error)
+      alert(error.response?.data?.error || "Error guardando caja por banco.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
   function fillHouseForm(item) {
     setHouseForm({
       betHouseId: String(item.betHouseId),
@@ -310,6 +295,16 @@ export default function CajaPage() {
     })
 
     scrollToElement("form-saldo-casa")
+  }
+
+  function fillBankForm(item) {
+    setBankForm({
+      bankId: String(item.bankId),
+      initialBalance: String(item.initialBalance || 0),
+      notes: item.notes || "",
+    })
+
+    scrollToElement("form-saldo-banco")
   }
 
   function setToday() {
@@ -324,6 +319,7 @@ export default function CajaPage() {
   }
 
   const houseCashBoxes = dailyCashBox?.houseCashBoxes || []
+  const bankCashBoxes = dailyCashBox?.bankCashBoxes || []
 
   const totalHouseInitialBalance = useMemo(() => {
     return houseCashBoxes.reduce(
@@ -331,6 +327,21 @@ export default function CajaPage() {
       0
     )
   }, [houseCashBoxes])
+
+  const totalBankInitialBalance = useMemo(() => {
+    return bankCashBoxes.reduce(
+      (sum, item) => sum + Number(item.initialBalance || 0),
+      0
+    )
+  }, [bankCashBoxes])
+
+  const totalOpening = useMemo(() => {
+    return (
+      Number(dailyCashBox?.salesInitialCash || 0) +
+      Number(totalHouseInitialBalance || 0) +
+      Number(totalBankInitialBalance || 0)
+    )
+  }, [dailyCashBox, totalHouseInitialBalance, totalBankInitialBalance])
 
   const selectedHouseName = useMemo(() => {
     const house = betHouses.find(
@@ -340,6 +351,12 @@ export default function CajaPage() {
     return house?.name || "-"
   }, [betHouses, houseForm.betHouseId])
 
+  const selectedBankName = useMemo(() => {
+    const bank = banks.find((item) => String(item.id) === String(bankForm.bankId))
+
+    return bank?.name || "-"
+  }, [banks, bankForm.bankId])
+
   const missingHouses = useMemo(() => {
     const registeredIds = new Set(
       houseCashBoxes.map((item) => String(item.betHouseId))
@@ -348,139 +365,13 @@ export default function CajaPage() {
     return betHouses.filter((house) => !registeredIds.has(String(house.id)))
   }, [betHouses, houseCashBoxes])
 
-  const selectableWithdrawals = useMemo(() => {
-    return withdrawals.filter((item) => {
-      return item.status !== "COMPENSADO" && item.status !== "ANULADO"
-    })
-  }, [withdrawals])
-
-  const selectedWithdrawal = useMemo(() => {
-    return withdrawals.find(
-      (item) => String(item.id) === String(paymentForm.withdrawalId)
+  const missingBanks = useMemo(() => {
+    const registeredIds = new Set(
+      bankCashBoxes.map((item) => String(item.bankId))
     )
-  }, [withdrawals, paymentForm.withdrawalId])
 
-  const remainingDifference = selectedWithdrawal
-    ? Number(selectedWithdrawal.difference || 0)
-    : 0
-
-  const projectedDifference = selectedWithdrawal
-    ? Number(selectedWithdrawal.difference || 0) -
-      Number(paymentForm.amount || 0)
-    : 0
-
-  const filteredCashEntries = useMemo(() => {
-    const text = search.toLowerCase().trim()
-
-    return cashEntries.filter((item) => {
-      const matchesDate = isDateInsideRange(item.createdAt, selectedDate)
-
-      const matchesSearch =
-        !text ||
-        item.withdrawal?.client?.name?.toLowerCase().includes(text) ||
-        item.withdrawal?.client?.cedula?.toLowerCase().includes(text) ||
-        item.withdrawal?.client?.phone?.toLowerCase().includes(text) ||
-        item.withdrawal?.betHouse?.name?.toLowerCase().includes(text) ||
-        item.betHouse?.name?.toLowerCase().includes(text) ||
-        item.withdrawal?.withdrawalCode?.toLowerCase().includes(text) ||
-        item.receiptNumber?.toLowerCase().includes(text) ||
-        item.paymentMethod?.toLowerCase().includes(text) ||
-        item.notes?.toLowerCase().includes(text)
-
-      return matchesDate && matchesSearch
-    })
-  }, [cashEntries, search, selectedDate])
-
-  const totalReceivedByHouses = filteredCashEntries.reduce(
-    (sum, item) => sum + Number(item.amount || 0),
-    0
-  )
-
-  const pendingAmount = withdrawals
-    .filter((item) => item.status !== "COMPENSADO" && item.status !== "ANULADO")
-    .reduce((sum, item) => sum + Number(item.difference || 0), 0)
-
-  function validatePaymentForm() {
-    if (!paymentForm.withdrawalId) {
-      alert("Selecciona el retiro que se va a compensar.")
-      return false
-    }
-
-    if (!paymentForm.amount || Number(paymentForm.amount) <= 0) {
-      alert("Ingresa un monto válido.")
-      return false
-    }
-
-    if (Number(paymentForm.amount) > Number(remainingDifference)) {
-      const confirmExtra = confirm(
-        "El valor pagado por la casa es mayor a la diferencia pendiente. ¿Deseas continuar?"
-      )
-
-      if (!confirmExtra) return false
-    }
-
-    if (!paymentForm.paymentMethod) {
-      alert("Selecciona el método de pago.")
-      return false
-    }
-
-    if (
-      paymentForm.paymentMethod === "TRANSFERENCIA" &&
-      !paymentForm.bankName
-    ) {
-      alert("Selecciona el banco.")
-      return false
-    }
-
-    if (!paymentForm.receiptNumber.trim()) {
-      alert("Ingresa el número de comprobante.")
-      return false
-    }
-
-    return true
-  }
-
-  function openConfirmPayment() {
-    if (!validatePaymentForm()) return
-
-    setConfirmOpen(true)
-  }
-
-  async function createCashEntry() {
-    try {
-      if (!validatePaymentForm()) return
-
-      setSaving(true)
-
-      const notes =
-        paymentForm.paymentMethod === "TRANSFERENCIA"
-          ? `Banco: ${paymentForm.bankName}${
-              paymentForm.notes ? ` | ${paymentForm.notes}` : ""
-            }`
-          : paymentForm.notes || "Pago en efectivo"
-
-      await api.post("/api/cash", {
-        type: "INGRESO",
-        amount: Number(paymentForm.amount),
-        paymentMethod: paymentForm.paymentMethod,
-        receiptNumber: paymentForm.receiptNumber,
-        notes,
-        betHouseId: selectedWithdrawal?.betHouseId || null,
-        withdrawalId: Number(paymentForm.withdrawalId),
-      })
-
-      setConfirmOpen(false)
-      resetPaymentForm()
-
-      await loadData(selectedDate)
-      alert("Pago de casa registrado correctamente.")
-    } catch (error) {
-      console.error(error)
-      alert(error.response?.data?.error || "Error registrando pago de casa.")
-    } finally {
-      setSaving(false)
-    }
-  }
+    return banks.filter((bank) => !registeredIds.has(String(bank.id)))
+  }, [banks, bankCashBoxes])
 
   return (
     <AppShell title="Caja">
@@ -489,7 +380,7 @@ export default function CajaPage() {
           <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.35em] text-[#ffd400]">
-                Apertura y compensaciones
+                Apertura de jornada
               </p>
 
               <h1 className="mt-2 text-3xl font-bold tracking-tight text-white">
@@ -497,8 +388,9 @@ export default function CajaPage() {
               </h1>
 
               <p className="mt-2 max-w-3xl text-sm text-white/75">
-                Registra la apertura de la jornada, saldos iniciales por casa y
-                pagos que las casas realizan para compensar retiros pendientes.
+                Registra el dinero con el que inicia la jornada: caja de ventas,
+                saldos iniciales de bancos y saldos iniciales por cada casa de
+                apuestas. El cierre final se realiza en el módulo de Cuadre.
               </p>
             </div>
 
@@ -521,7 +413,7 @@ export default function CajaPage() {
                 </CardTitle>
 
                 <p className="mt-1 text-sm text-zinc-400">
-                  Selecciona la fecha para crear o consultar la caja.
+                  Selecciona la fecha para crear o consultar la apertura de caja.
                 </p>
               </div>
 
@@ -577,7 +469,7 @@ export default function CajaPage() {
           </CardContent>
         </Card>
 
-        <div className="grid gap-4 md:grid-cols-5">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <Card className="border-white/10 bg-[#0b0b0d] text-white">
             <CardContent className="p-5">
               <p className="text-sm text-zinc-400">Caja inicial ventas</p>
@@ -587,6 +479,60 @@ export default function CajaPage() {
             </CardContent>
           </Card>
 
+          <Card className="border-white/10 bg-[#0b0b0d] text-white">
+            <CardContent className="p-5">
+              <p className="text-sm text-zinc-400">Saldo inicial bancos</p>
+              <p className="mt-2 text-3xl font-bold">
+                {formatMoney(totalBankInitialBalance)}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-white/10 bg-[#0b0b0d] text-white">
+            <CardContent className="p-5">
+              <p className="text-sm text-zinc-400">Saldo inicial casas</p>
+              <p className="mt-2 text-3xl font-bold">
+                {formatMoney(totalHouseInitialBalance)}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-white/10 bg-[#0b0b0d] text-white">
+            <CardContent className="p-5">
+              <p className="text-sm text-zinc-400">Total apertura</p>
+              <p className="mt-2 text-3xl font-bold text-[#ffd400]">
+                {formatMoney(totalOpening)}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {banks.map((bank) => {
+            const balance = bankCashBoxes.find(
+              (item) => String(item.bankId) === String(bank.id)
+            )
+
+            return (
+              <Card
+                key={bank.id}
+                className="border-white/10 bg-[#0b0b0d] text-white"
+              >
+                <CardContent className="p-5">
+                  <p className="text-sm text-zinc-400">{bank.name}</p>
+                  <p className="mt-2 text-2xl font-bold text-[#ffd400]">
+                    {formatMoney(balance?.initialBalance)}
+                  </p>
+                  <p className="mt-1 text-xs text-zinc-500">
+                    Saldo inicial banco
+                  </p>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {betHouses.map((house) => {
             const balance = houseCashBoxes.find(
               (item) => String(item.betHouseId) === String(house.id)
@@ -599,7 +545,7 @@ export default function CajaPage() {
               >
                 <CardContent className="p-5">
                   <p className="text-sm text-zinc-400">{house.name}</p>
-                  <p className="mt-2 text-3xl font-bold text-[#ffd400]">
+                  <p className="mt-2 text-2xl font-bold text-[#ffd400]">
                     {formatMoney(balance?.initialBalance)}
                   </p>
                   <p className="mt-1 text-xs text-zinc-500">
@@ -609,35 +555,6 @@ export default function CajaPage() {
               </Card>
             )
           })}
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card className="border-white/10 bg-[#0b0b0d] text-white">
-            <CardContent className="p-5">
-              <p className="text-sm text-zinc-400">Pagado por casas hoy</p>
-              <p className="mt-2 text-3xl font-bold text-[#ffd400]">
-                {formatMoney(totalReceivedByHouses)}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-white/10 bg-[#0b0b0d] text-white">
-            <CardContent className="p-5">
-              <p className="text-sm text-zinc-400">Pendiente por compensar</p>
-              <p className="mt-2 text-3xl font-bold">
-                {formatMoney(pendingAmount)}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-white/10 bg-[#0b0b0d] text-white">
-            <CardContent className="p-5">
-              <p className="text-sm text-zinc-400">Pagos registrados hoy</p>
-              <p className="mt-2 text-3xl font-bold">
-                {filteredCashEntries.length}
-              </p>
-            </CardContent>
-          </Card>
         </div>
 
         <Card className="border-white/10 bg-[#0b0b0d] text-white shadow-2xl">
@@ -698,6 +615,103 @@ export default function CajaPage() {
               >
                 <Save className="mr-2 h-4 w-4" />
                 Guardar caja diaria
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card
+          id="form-saldo-banco"
+          className="border-white/10 bg-[#0b0b0d] text-white shadow-2xl"
+        >
+          <CardHeader className="border-b border-white/10">
+            <CardTitle className="flex items-center gap-2 text-xl font-bold">
+              <Building2 className="h-5 w-5 text-[#ffd400]" />
+              Saldos iniciales de bancos
+            </CardTitle>
+
+            <p className="text-sm text-zinc-400">
+              Registra cuánto dinero existe al iniciar el día en cada banco o
+              cuenta.
+            </p>
+          </CardHeader>
+
+          <CardContent className="p-6">
+            <div className="grid gap-4 md:grid-cols-[1fr_200px_1fr]">
+              <div className="space-y-2">
+                <Label className="text-zinc-300">Banco / cuenta</Label>
+                <Select
+                  value={bankForm.bankId}
+                  onValueChange={(value) =>
+                    setBankForm({ ...bankForm, bankId: value })
+                  }
+                >
+                  <SelectTrigger className="h-11 border-white/10 bg-black text-white">
+                    <SelectValue placeholder="Selecciona banco" />
+                  </SelectTrigger>
+
+                  <SelectContent className="border-white/10 bg-[#0b0b0d] text-white">
+                    {banks.length === 0 ? (
+                      <SelectItem value="SIN_BANCOS" disabled>
+                        Sin bancos registrados
+                      </SelectItem>
+                    ) : (
+                      banks.map((bank) => (
+                        <SelectItem key={bank.id} value={String(bank.id)}>
+                          {bank.name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-zinc-300">Saldo inicial</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={bankForm.initialBalance}
+                  onChange={(e) =>
+                    setBankForm({
+                      ...bankForm,
+                      initialBalance: e.target.value,
+                    })
+                  }
+                  placeholder="0.00"
+                  className="h-11 border-white/10 bg-black text-white placeholder:text-zinc-600"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-zinc-300">Observación</Label>
+                <Input
+                  value={bankForm.notes}
+                  onChange={(e) =>
+                    setBankForm({ ...bankForm, notes: e.target.value })
+                  }
+                  placeholder="Opcional"
+                  className="h-11 border-white/10 bg-black text-white placeholder:text-zinc-600"
+                />
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-[#ffd400]/20 bg-[#ffd400]/10 p-4 text-sm text-[#ffd400]">
+              Banco seleccionado:{" "}
+              <span className="font-bold">{selectedBankName}</span>. Si ya
+              existe saldo para ese banco en esta fecha, se actualizará.
+            </div>
+
+            <div className="mt-5 flex justify-end border-t border-white/10 pt-5">
+              <Button
+                type="button"
+                onClick={saveBankCashBox}
+                disabled={saving}
+                className="h-11 w-full bg-[#d90416] px-8 font-semibold text-white hover:bg-[#ff1024] md:w-auto"
+              >
+                <Save className="mr-2 h-4 w-4" />
+                Guardar saldo de banco
               </Button>
             </div>
           </CardContent>
@@ -802,263 +816,6 @@ export default function CajaPage() {
 
         <Card className="border-white/10 bg-[#0b0b0d] text-white shadow-2xl">
           <CardHeader className="border-b border-white/10">
-            <CardTitle className="flex items-center gap-2 text-xl font-bold">
-              <ReceiptText className="h-5 w-5 text-[#ffd400]" />
-              Pago de casa / compensar retiro
-            </CardTitle>
-
-            <p className="text-sm text-zinc-400">
-              Selecciona un retiro pendiente y registra el valor que la casa ya
-              pagó a la tienda.
-            </p>
-          </CardHeader>
-
-          <CardContent className="p-6">
-            <div className="space-y-5">
-              <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr_1fr]">
-                <div className="space-y-2">
-                  <Label className="text-zinc-300">Retiro a compensar</Label>
-                  <Select
-                    value={paymentForm.withdrawalId}
-                    onValueChange={(value) => {
-                      const withdrawal = withdrawals.find(
-                        (item) => String(item.id) === String(value)
-                      )
-
-                      setPaymentForm({
-                        ...paymentForm,
-                        withdrawalId: value,
-                        amount: withdrawal?.difference || "",
-                      })
-                    }}
-                  >
-                    <SelectTrigger className="h-11 border-white/10 bg-black text-white">
-                      <SelectValue placeholder="Selecciona retiro pendiente" />
-                    </SelectTrigger>
-
-                    <SelectContent className="border-white/10 bg-[#0b0b0d] text-white">
-                      {selectableWithdrawals.length === 0 ? (
-                        <SelectItem value="SIN_RETIROS" disabled>
-                          Sin retiros pendientes
-                        </SelectItem>
-                      ) : (
-                        selectableWithdrawals.map((item) => (
-                          <SelectItem key={item.id} value={String(item.id)}>
-                            {item.client?.name || "-"} ·{" "}
-                            {item.betHouse?.name || "-"} · #
-                            {item.withdrawalCode || "-"} ·{" "}
-                            {formatMoney(item.difference)}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-zinc-300">
-                    Valor pagado por la casa
-                  </Label>
-                  <Input
-                    value={paymentForm.amount}
-                    onChange={(e) =>
-                      setPaymentForm({
-                        ...paymentForm,
-                        amount: e.target.value,
-                      })
-                    }
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="0.00"
-                    className="h-11 border-white/10 bg-black text-white placeholder:text-zinc-600"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-zinc-300">Método</Label>
-                  <Select
-                    value={paymentForm.paymentMethod}
-                    onValueChange={(value) =>
-                      setPaymentForm({
-                        ...paymentForm,
-                        paymentMethod: value,
-                        bankName:
-                          value === "EFECTIVO" ? "" : paymentForm.bankName,
-                      })
-                    }
-                  >
-                    <SelectTrigger className="h-11 border-white/10 bg-black text-white">
-                      <SelectValue placeholder="Método" />
-                    </SelectTrigger>
-
-                    <SelectContent className="border-white/10 bg-[#0b0b0d] text-white">
-                      <SelectItem value="TRANSFERENCIA">
-                        <div className="flex items-center gap-2">
-                          <CreditCard className="h-4 w-4 text-[#ffd400]" />
-                          Transferencia
-                        </div>
-                      </SelectItem>
-
-                      <SelectItem value="EFECTIVO">
-                        <div className="flex items-center gap-2">
-                          <Banknote className="h-4 w-4 text-[#ffd400]" />
-                          Efectivo
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {selectedWithdrawal && (
-                <div className="rounded-2xl border border-[#ffd400]/20 bg-[#ffd400]/10 p-4">
-                  <div className="grid gap-3 text-sm md:grid-cols-4">
-                    <div>
-                      <p className="text-[#ffd400]/80">Cliente</p>
-                      <p className="mt-1 font-bold text-white">
-                        {selectedWithdrawal.client?.name || "-"}
-                      </p>
-                      <p className="text-xs text-white/50">
-                        {selectedWithdrawal.client?.cedula || "-"} ·{" "}
-                        {selectedWithdrawal.client?.phone || "-"}
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="text-[#ffd400]/80">Casa</p>
-                      <p className="mt-1 font-bold text-white">
-                        {selectedWithdrawal.betHouse?.name || "-"}
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="text-[#ffd400]/80"># retiro</p>
-                      <p className="mt-1 font-bold text-white">
-                        {selectedWithdrawal.withdrawalCode || "-"}
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="text-[#ffd400]/80">Diferencia actual</p>
-                      <p className="mt-1 font-bold text-white">
-                        {formatMoney(selectedWithdrawal.difference)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="grid gap-4 md:grid-cols-3">
-                {paymentForm.paymentMethod === "TRANSFERENCIA" && (
-                  <div className="space-y-2">
-                    <Label className="text-zinc-300">Banco</Label>
-                    <Select
-                      value={paymentForm.bankName}
-                      onValueChange={(value) =>
-                        setPaymentForm({
-                          ...paymentForm,
-                          bankName: value,
-                        })
-                      }
-                    >
-                      <SelectTrigger className="h-11 border-white/10 bg-black text-white">
-                        <SelectValue placeholder="Selecciona banco" />
-                      </SelectTrigger>
-
-                      <SelectContent className="border-white/10 bg-[#0b0b0d] text-white">
-                        {banks.length === 0 ? (
-                          <SelectItem value="SIN_BANCOS" disabled>
-                            Sin bancos registrados
-                          </SelectItem>
-                        ) : (
-                          banks.map((bank) => (
-                            <SelectItem key={bank.id} value={bank.name}>
-                              {bank.name}
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                <div className="space-y-2">
-                  <Label className="text-zinc-300"># comprobante</Label>
-                  <Input
-                    value={paymentForm.receiptNumber}
-                    onChange={(e) =>
-                      setPaymentForm({
-                        ...paymentForm,
-                        receiptNumber: e.target.value,
-                      })
-                    }
-                    placeholder="Ej: 001234567"
-                    className="h-11 border-white/10 bg-black text-white placeholder:text-zinc-600"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-zinc-300">Nota opcional</Label>
-                  <Input
-                    value={paymentForm.notes}
-                    onChange={(e) =>
-                      setPaymentForm({
-                        ...paymentForm,
-                        notes: e.target.value,
-                      })
-                    }
-                    placeholder="Observación"
-                    className="h-11 border-white/10 bg-black text-white placeholder:text-zinc-600"
-                  />
-                </div>
-              </div>
-
-              {selectedWithdrawal && (
-                <div className="rounded-2xl border border-white/10 bg-black p-4">
-                  <div className="grid gap-4 md:grid-cols-3">
-                    <div>
-                      <p className="text-sm text-zinc-500">Diferencia actual</p>
-                      <p className="mt-1 text-2xl font-bold text-white">
-                        {formatMoney(remainingDifference)}
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="text-sm text-zinc-500">
-                        Valor pagado por la casa
-                      </p>
-                      <p className="mt-1 text-2xl font-bold text-[#ffd400]">
-                        {formatMoney(paymentForm.amount)}
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="text-sm text-zinc-500">Diferencia final</p>
-                      <p className="mt-1 text-2xl font-bold text-white">
-                        {formatMoney(projectedDifference)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex justify-end border-t border-white/10 pt-5">
-                <Button
-                  type="button"
-                  onClick={openConfirmPayment}
-                  disabled={saving}
-                  className="h-11 w-full bg-[#d90416] px-8 font-semibold text-white hover:bg-[#ff1024] md:w-auto"
-                >
-                  Registrar pago de casa
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-white/10 bg-[#0b0b0d] text-white shadow-2xl">
-          <CardHeader className="border-b border-white/10">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <CardTitle className="text-xl font-bold">
@@ -1071,18 +828,27 @@ export default function CajaPage() {
               </div>
 
               <div className="rounded-2xl border border-white/10 bg-black px-4 py-2 text-sm text-zinc-400">
-                Casas registradas:{" "}
+                Registros:{" "}
                 <span className="font-bold text-[#ffd400]">
-                  {houseCashBoxes.length}
+                  {bankCashBoxes.length + houseCashBoxes.length}
                 </span>
               </div>
             </div>
           </CardHeader>
 
-          <CardContent className="p-6">
+          <CardContent className="space-y-6 p-6">
+            {missingBanks.length > 0 && (
+              <div className="rounded-2xl border border-[#ffd400]/20 bg-[#ffd400]/10 p-4 text-sm text-[#ffd400]">
+                Bancos pendientes:{" "}
+                <span className="font-bold">
+                  {missingBanks.map((bank) => bank.name).join(", ")}
+                </span>
+              </div>
+            )}
+
             {missingHouses.length > 0 && (
-              <div className="mb-5 rounded-2xl border border-[#ffd400]/20 bg-[#ffd400]/10 p-4 text-sm text-[#ffd400]">
-                Faltan por registrar:{" "}
+              <div className="rounded-2xl border border-[#ffd400]/20 bg-[#ffd400]/10 p-4 text-sm text-[#ffd400]">
+                Casas pendientes:{" "}
                 <span className="font-bold">
                   {missingHouses.map((house) => house.name).join(", ")}
                 </span>
@@ -1093,8 +859,8 @@ export default function CajaPage() {
               <Table>
                 <TableHeader>
                   <TableRow className="border-white/10 bg-white/[0.03] hover:bg-white/[0.03]">
-                    <TableHead className="text-zinc-400">Fecha</TableHead>
-                    <TableHead className="text-zinc-400">Casa</TableHead>
+                    <TableHead className="text-zinc-400">Tipo</TableHead>
+                    <TableHead className="text-zinc-400">Nombre</TableHead>
                     <TableHead className="text-zinc-400">Observación</TableHead>
                     <TableHead className="text-right text-zinc-400">
                       Saldo inicial
@@ -1127,61 +893,107 @@ export default function CajaPage() {
                         Primero guarda la caja diaria para esta fecha.
                       </TableCell>
                     </TableRow>
-                  ) : houseCashBoxes.length === 0 ? (
+                  ) : bankCashBoxes.length === 0 &&
+                    houseCashBoxes.length === 0 ? (
                     <TableRow className="border-white/10">
                       <TableCell
                         colSpan={6}
                         className="py-10 text-center text-zinc-400"
                       >
-                        No hay saldos iniciales por casa registrados.
+                        No hay saldos iniciales registrados.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    houseCashBoxes.map((item) => (
-                      <TableRow
-                        key={item.id}
-                        className="border-white/10 hover:bg-white/[0.03]"
-                      >
-                        <TableCell className="text-zinc-400">
-                          {formatDate(dailyCashBox.date)}
-                        </TableCell>
+                    <>
+                      {bankCashBoxes.map((item) => (
+                        <TableRow
+                          key={`bank-${item.id}`}
+                          className="border-white/10 hover:bg-white/[0.03]"
+                        >
+                          <TableCell>
+                            <Badge className="bg-blue-500/15 text-blue-300 hover:bg-blue-500/15">
+                              Banco
+                            </Badge>
+                          </TableCell>
 
-                        <TableCell className="font-medium text-white">
-                          {item.betHouse?.name || "-"}
-                        </TableCell>
+                          <TableCell className="font-medium text-white">
+                            {item.bank?.name || "-"}
+                          </TableCell>
 
-                        <TableCell className="text-zinc-400">
-                          {item.notes || "-"}
-                        </TableCell>
+                          <TableCell className="text-zinc-400">
+                            {item.notes || "-"}
+                          </TableCell>
 
-                        <TableCell className="text-right font-bold text-[#ffd400]">
-                          {formatMoney(item.initialBalance)}
-                        </TableCell>
+                          <TableCell className="text-right font-bold text-[#ffd400]">
+                            {formatMoney(item.initialBalance)}
+                          </TableCell>
 
-                        <TableCell className="text-right">
-                          <Badge className="bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/15">
-                            Aperturada
-                          </Badge>
-                        </TableCell>
+                          <TableCell className="text-right">
+                            <Badge className="bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/15">
+                              Aperturada
+                            </Badge>
+                          </TableCell>
 
-                        <TableCell className="text-right">
-                          <Button
-                            type="button"
-                            onClick={() => fillHouseForm(item)}
-                            className="h-9 border border-white/10 bg-black px-4 text-sm font-semibold text-white hover:bg-white/10"
-                          >
-                            Editar
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
+                          <TableCell className="text-right">
+                            <Button
+                              type="button"
+                              onClick={() => fillBankForm(item)}
+                              className="h-9 border border-white/10 bg-black px-4 text-sm font-semibold text-white hover:bg-white/10"
+                            >
+                              Editar
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+
+                      {houseCashBoxes.map((item) => (
+                        <TableRow
+                          key={`house-${item.id}`}
+                          className="border-white/10 hover:bg-white/[0.03]"
+                        >
+                          <TableCell>
+                            <Badge className="bg-[#ffd400]/15 text-[#ffd400] hover:bg-[#ffd400]/15">
+                              Casa
+                            </Badge>
+                          </TableCell>
+
+                          <TableCell className="font-medium text-white">
+                            {item.betHouse?.name || "-"}
+                          </TableCell>
+
+                          <TableCell className="text-zinc-400">
+                            {item.notes || "-"}
+                          </TableCell>
+
+                          <TableCell className="text-right font-bold text-[#ffd400]">
+                            {formatMoney(item.initialBalance)}
+                          </TableCell>
+
+                          <TableCell className="text-right">
+                            <Badge className="bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/15">
+                              Aperturada
+                            </Badge>
+                          </TableCell>
+
+                          <TableCell className="text-right">
+                            <Button
+                              type="button"
+                              onClick={() => fillHouseForm(item)}
+                              className="h-9 border border-white/10 bg-black px-4 text-sm font-semibold text-white hover:bg-white/10"
+                            >
+                              Editar
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </>
                   )}
                 </TableBody>
               </Table>
             </div>
 
-            <div className="mt-5 rounded-2xl border border-white/10 bg-black p-4">
-              <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-2xl border border-white/10 bg-black p-4">
+              <div className="grid gap-4 md:grid-cols-4">
                 <div>
                   <p className="text-sm text-zinc-500">Caja inicial ventas</p>
                   <p className="mt-1 text-2xl font-bold text-[#ffd400]">
@@ -1190,139 +1002,26 @@ export default function CajaPage() {
                 </div>
 
                 <div>
-                  <p className="text-sm text-zinc-500">Saldo inicial casas</p>
+                  <p className="text-sm text-zinc-500">Bancos</p>
+                  <p className="mt-1 text-2xl font-bold text-white">
+                    {formatMoney(totalBankInitialBalance)}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-sm text-zinc-500">Casas</p>
                   <p className="mt-1 text-2xl font-bold text-white">
                     {formatMoney(totalHouseInitialBalance)}
                   </p>
                 </div>
+
+                <div>
+                  <p className="text-sm text-zinc-500">Total apertura</p>
+                  <p className="mt-1 text-2xl font-bold text-[#ffd400]">
+                    {formatMoney(totalOpening)}
+                  </p>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-white/10 bg-[#0b0b0d] text-white shadow-2xl">
-          <CardHeader className="border-b border-white/10">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <CardTitle className="text-xl font-bold">
-                  Movimientos de caja / pagos de casas
-                </CardTitle>
-
-                <p className="mt-1 text-sm text-zinc-400">
-                  Historial de pagos que las casas realizaron para compensar
-                  retiros.
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-black px-4 py-2 text-sm text-zinc-400">
-                Registros hoy:{" "}
-                <span className="font-bold text-[#ffd400]">
-                  {filteredCashEntries.length}
-                </span>
-              </div>
-            </div>
-          </CardHeader>
-
-          <CardContent className="p-6">
-            <div className="mb-5">
-              <div className="relative w-full">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-                <Input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Buscar movimiento..."
-                  className="h-11 border-white/10 bg-black pl-10 text-white placeholder:text-zinc-600"
-                />
-              </div>
-            </div>
-
-            <div className="overflow-hidden rounded-2xl border border-white/10">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-white/10 bg-white/[0.03] hover:bg-white/[0.03]">
-                    <TableHead className="text-zinc-400">Fecha</TableHead>
-                    <TableHead className="text-zinc-400">Retiro</TableHead>
-                    <TableHead className="text-zinc-400">Casa</TableHead>
-                    <TableHead className="text-zinc-400">Método</TableHead>
-                    <TableHead className="text-zinc-400">Comprobante</TableHead>
-                    <TableHead className="text-right text-zinc-400">
-                      Monto
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-
-                <TableBody>
-                  {loading ? (
-                    <TableRow className="border-white/10">
-                      <TableCell
-                        colSpan={6}
-                        className="py-8 text-center text-zinc-400"
-                      >
-                        Cargando movimientos...
-                      </TableCell>
-                    </TableRow>
-                  ) : filteredCashEntries.length === 0 ? (
-                    <TableRow className="border-white/10">
-                      <TableCell
-                        colSpan={6}
-                        className="py-10 text-center text-zinc-400"
-                      >
-                        No hay pagos de casas registrados para esta fecha.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredCashEntries.map((item) => (
-                      <TableRow
-                        key={item.id}
-                        className="border-white/10 hover:bg-white/[0.03]"
-                      >
-                        <TableCell className="text-zinc-400">
-                          {formatDate(item.createdAt)}
-                        </TableCell>
-
-                        <TableCell>
-                          <div>
-                            <p className="font-medium text-white">
-                              {item.withdrawal?.client?.name ||
-                                "Movimiento general"}
-                            </p>
-                            <p className="text-xs text-zinc-500">
-                              #{item.withdrawal?.withdrawalCode || "-"} ·{" "}
-                              {item.withdrawal?.client?.cedula || "-"}
-                            </p>
-                          </div>
-                        </TableCell>
-
-                        <TableCell>
-                          {item.withdrawal?.betHouse?.name ||
-                            item.betHouse?.name ||
-                            "-"}
-                        </TableCell>
-
-                        <TableCell>
-                          <Badge
-                            className={
-                              item.paymentMethod === "EFECTIVO"
-                                ? "bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/15"
-                                : "bg-[#ffd400]/15 text-[#ffd400] hover:bg-[#ffd400]/15"
-                            }
-                          >
-                            {item.paymentMethod || "-"}
-                          </Badge>
-                        </TableCell>
-
-                        <TableCell className="text-zinc-400">
-                          {item.receiptNumber || "-"}
-                        </TableCell>
-
-                        <TableCell className="text-right font-bold text-[#ffd400]">
-                          {formatMoney(item.amount)}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
             </div>
           </CardContent>
         </Card>
@@ -1358,9 +1057,11 @@ export default function CajaPage() {
                     <TableHead className="text-zinc-400">
                       Caja ventas
                     </TableHead>
+                    <TableHead className="text-zinc-400">Bancos</TableHead>
                     <TableHead className="text-zinc-400">
-                      Casas registradas
+                      Saldo bancos
                     </TableHead>
+                    <TableHead className="text-zinc-400">Casas</TableHead>
                     <TableHead className="text-zinc-400">
                       Saldo casas
                     </TableHead>
@@ -1375,7 +1076,7 @@ export default function CajaPage() {
                   {loading ? (
                     <TableRow className="border-white/10">
                       <TableCell
-                        colSpan={6}
+                        colSpan={8}
                         className="py-8 text-center text-zinc-400"
                       >
                         Cargando historial...
@@ -1384,7 +1085,7 @@ export default function CajaPage() {
                   ) : dailyCashBoxHistory.length === 0 ? (
                     <TableRow className="border-white/10">
                       <TableCell
-                        colSpan={6}
+                        colSpan={8}
                         className="py-10 text-center text-zinc-400"
                       >
                         Todavía no hay cajas diarias registradas.
@@ -1405,7 +1106,17 @@ export default function CajaPage() {
                         </TableCell>
 
                         <TableCell>
-                          <Badge className="bg-white/10 text-zinc-300 hover:bg-white/10">
+                          <Badge className="bg-blue-500/15 text-blue-300 hover:bg-blue-500/15">
+                            {item.banksCount || 0} bancos
+                          </Badge>
+                        </TableCell>
+
+                        <TableCell className="font-bold text-white">
+                          {formatMoney(item.totalBankInitialBalance)}
+                        </TableCell>
+
+                        <TableCell>
+                          <Badge className="bg-[#ffd400]/15 text-[#ffd400] hover:bg-[#ffd400]/15">
                             {item.housesCount || 0} casas
                           </Badge>
                         </TableCell>
@@ -1436,114 +1147,6 @@ export default function CajaPage() {
           </CardContent>
         </Card>
       </div>
-
-      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <DialogContent className="border-white/10 bg-[#0b0b0d] text-white sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-bold">
-              Confirmar pago de casa
-            </DialogTitle>
-            <p className="text-sm text-zinc-400">
-              Revisa los datos antes de registrar el movimiento de caja.
-            </p>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="rounded-2xl border border-[#ffd400]/20 bg-[#ffd400]/10 p-4">
-              <p className="text-sm text-[#ffd400]">
-                Este pago representa el valor que la casa transfirió a la tienda
-                y quedará vinculado al retiro seleccionado.
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-black p-4">
-              <div className="grid gap-3 text-sm">
-                <div className="flex justify-between gap-4">
-                  <span className="text-zinc-500">Cliente</span>
-                  <span className="font-semibold text-white">
-                    {selectedWithdrawal?.client?.name || "-"}
-                  </span>
-                </div>
-
-                <div className="flex justify-between gap-4">
-                  <span className="text-zinc-500">Casa</span>
-                  <span className="font-semibold text-white">
-                    {selectedWithdrawal?.betHouse?.name || "-"}
-                  </span>
-                </div>
-
-                <div className="flex justify-between gap-4">
-                  <span className="text-zinc-500"># retiro</span>
-                  <span className="font-semibold text-white">
-                    {selectedWithdrawal?.withdrawalCode || "-"}
-                  </span>
-                </div>
-
-                <div className="flex justify-between gap-4">
-                  <span className="text-zinc-500">Método</span>
-                  <span className="font-semibold text-white">
-                    {paymentForm.paymentMethod}
-                  </span>
-                </div>
-
-                {paymentForm.paymentMethod === "TRANSFERENCIA" && (
-                  <div className="flex justify-between gap-4">
-                    <span className="text-zinc-500">Banco</span>
-                    <span className="font-semibold text-white">
-                      {paymentForm.bankName || "-"}
-                    </span>
-                  </div>
-                )}
-
-                <div className="flex justify-between gap-4">
-                  <span className="text-zinc-500">Comprobante</span>
-                  <span className="font-semibold text-white">
-                    {paymentForm.receiptNumber || "-"}
-                  </span>
-                </div>
-
-                <div className="border-t border-white/10 pt-3">
-                  <div className="flex justify-between gap-4">
-                    <span className="text-zinc-500">
-                      Valor pagado por la casa
-                    </span>
-                    <span className="text-2xl font-bold text-[#ffd400]">
-                      {formatMoney(paymentForm.amount)}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex justify-between gap-4">
-                  <span className="text-zinc-500">Diferencia final</span>
-                  <span className="font-semibold text-white">
-                    {formatMoney(projectedDifference)}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-              <Button
-                type="button"
-                onClick={() => setConfirmOpen(false)}
-                disabled={saving}
-                className="border border-white/10 bg-black font-semibold text-white hover:bg-white/10"
-              >
-                Cancelar
-              </Button>
-
-              <Button
-                type="button"
-                onClick={createCashEntry}
-                disabled={saving}
-                className="bg-[#d90416] font-semibold text-white hover:bg-[#ff1024]"
-              >
-                {saving ? "Guardando..." : "Confirmar pago de casa"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </AppShell>
   )
 }
