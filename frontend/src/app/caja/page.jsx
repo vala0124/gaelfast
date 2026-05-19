@@ -128,6 +128,19 @@ export default function CajaPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate])
 
+  function scrollToElement(id) {
+    setTimeout(() => {
+      const element = document.getElementById(id)
+
+      if (element) {
+        element.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        })
+      }
+    }, 150)
+  }
+
   function resetHouseForm() {
     setHouseForm({
       betHouseId: "",
@@ -220,6 +233,8 @@ export default function CajaPage() {
       initialBalance: String(item.initialBalance || 0),
       notes: item.notes || "",
     })
+
+    scrollToElement("form-saldo-casa")
   }
 
   function setToday() {
@@ -227,7 +242,10 @@ export default function CajaPage() {
   }
 
   function openHistoryDate(dateValue) {
-    setSelectedDate(getDateKey(dateValue))
+    const dateKey = getDateKey(dateValue)
+
+    setSelectedDate(dateKey)
+    scrollToElement("fecha-caja")
   }
 
   const houseCashBoxes = dailyCashBox?.houseCashBoxes || []
@@ -282,7 +300,10 @@ export default function CajaPage() {
           </div>
         </div>
 
-        <Card className="border-white/10 bg-[#0b0b0d] text-white shadow-2xl">
+        <Card
+          id="fecha-caja"
+          className="border-white/10 bg-[#0b0b0d] text-white shadow-2xl"
+        >
           <CardHeader className="border-b border-white/10">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
@@ -445,7 +466,10 @@ export default function CajaPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-white/10 bg-[#0b0b0d] text-white shadow-2xl">
+        <Card
+          id="form-saldo-casa"
+          className="border-white/10 bg-[#0b0b0d] text-white shadow-2xl"
+        >
           <CardHeader className="border-b border-white/10">
             <CardTitle className="flex items-center gap-2 text-xl font-bold">
               <Landmark className="h-5 w-5 text-[#ffd400]" />
