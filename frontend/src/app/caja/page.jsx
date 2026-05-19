@@ -58,11 +58,6 @@ function getTodayDate() {
   return `${year}-${month}-${day}`
 }
 
-function getDateKey(value) {
-  if (!value) return ""
-  return String(value).slice(0, 10)
-}
-
 export default function CajaPage() {
   const today = getTodayDate()
 
@@ -228,10 +223,6 @@ export default function CajaPage() {
     )
   }, [houseCashBoxes])
 
-  const totalOpening = useMemo(() => {
-    return Number(dailyCashBox?.salesInitialCash || 0) + totalHouseInitialBalance
-  }, [dailyCashBox, totalHouseInitialBalance])
-
   const selectedHouseName = useMemo(() => {
     const house = betHouses.find(
       (item) => String(item.id) === String(houseForm.betHouseId)
@@ -340,7 +331,7 @@ export default function CajaPage() {
           </CardContent>
         </Card>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-5">
           <Card className="border-white/10 bg-[#0b0b0d] text-white">
             <CardContent className="p-5">
               <p className="text-sm text-zinc-400">Caja inicial ventas</p>
@@ -350,23 +341,28 @@ export default function CajaPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-white/10 bg-[#0b0b0d] text-white">
-            <CardContent className="p-5">
-              <p className="text-sm text-zinc-400">Saldo inicial casas</p>
-              <p className="mt-2 text-3xl font-bold">
-                {formatMoney(totalHouseInitialBalance)}
-              </p>
-            </CardContent>
-          </Card>
+          {betHouses.map((house) => {
+            const balance = houseCashBoxes.find(
+              (item) => String(item.betHouseId) === String(house.id)
+            )
 
-          <Card className="border-white/10 bg-[#0b0b0d] text-white">
-            <CardContent className="p-5">
-              <p className="text-sm text-zinc-400">Total apertura</p>
-              <p className="mt-2 text-3xl font-bold text-[#ffd400]">
-                {formatMoney(totalOpening)}
-              </p>
-            </CardContent>
-          </Card>
+            return (
+              <Card
+                key={house.id}
+                className="border-white/10 bg-[#0b0b0d] text-white"
+              >
+                <CardContent className="p-5">
+                  <p className="text-sm text-zinc-400">{house.name}</p>
+                  <p className="mt-2 text-3xl font-bold text-[#ffd400]">
+                    {formatMoney(balance?.initialBalance)}
+                  </p>
+                  <p className="mt-1 text-xs text-zinc-500">
+                    Saldo inicial casa
+                  </p>
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
 
         <Card className="border-white/10 bg-[#0b0b0d] text-white shadow-2xl">
@@ -651,25 +647,18 @@ export default function CajaPage() {
             </div>
 
             <div className="mt-5 rounded-2xl border border-white/10 bg-black p-4">
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-2">
                 <div>
-                  <p className="text-sm text-zinc-500">Caja ventas</p>
+                  <p className="text-sm text-zinc-500">Caja inicial ventas</p>
                   <p className="mt-1 text-2xl font-bold text-[#ffd400]">
                     {formatMoney(dailyCashBox?.salesInitialCash)}
                   </p>
                 </div>
 
                 <div>
-                  <p className="text-sm text-zinc-500">Casas</p>
+                  <p className="text-sm text-zinc-500">Saldo inicial casas</p>
                   <p className="mt-1 text-2xl font-bold text-white">
                     {formatMoney(totalHouseInitialBalance)}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-sm text-zinc-500">Total apertura</p>
-                  <p className="mt-1 text-2xl font-bold text-[#ffd400]">
-                    {formatMoney(totalOpening)}
                   </p>
                 </div>
               </div>
