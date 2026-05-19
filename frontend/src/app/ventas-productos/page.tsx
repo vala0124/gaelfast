@@ -55,6 +55,9 @@ type ProductSale = {
   unitPrice: number
   total: number
   paymentMethod: string
+  bankName?: string | null
+  receiptNumber?: string | null
+  notes?: string | null
   createdAt: string
   product?: Product
 }
@@ -67,6 +70,15 @@ type ApiError = {
     }
   }
 }
+
+const banks = [
+  "Coopmego",
+  "Banco Guayaquil",
+  "Pichincha",
+  "Banco de Loja",
+  "JEP",
+  "Produbanco",
+]
 
 function formatMoney(value: number | string | null | undefined) {
   const number = Number(value || 0)
@@ -116,6 +128,10 @@ export default function VentasProductosPage() {
   const [paymentMethod, setPaymentMethod] = useState("EFECTIVO")
   const [cashReceived, setCashReceived] = useState("")
 
+  const [bankName, setBankName] = useState("")
+  const [receiptNumber, setReceiptNumber] = useState("")
+  const [notes, setNotes] = useState("")
+
   const [search, setSearch] = useState("")
   const [startDate, setStartDate] = useState(today)
   const [endDate, setEndDate] = useState(today)
@@ -152,6 +168,9 @@ export default function VentasProductosPage() {
     setUnitPrice("")
     setPaymentMethod("EFECTIVO")
     setCashReceived("")
+    setBankName("")
+    setReceiptNumber("")
+    setNotes("")
 
     setTimeout(() => {
       barcodeInputRef.current?.focus()
@@ -169,13 +188,19 @@ export default function VentasProductosPage() {
     try {
       setSaving(true)
 
-      const res = await api.get(`/api/products/barcode/${encodeURIComponent(barcode)}`)
+      const res = await api.get(
+        `/api/products/barcode/${encodeURIComponent(barcode)}`
+      )
+
       const product: Product = res.data
 
       setSelectedProduct(product)
       setUnitPrice(String(product.salePrice || ""))
       setQuantity("1")
       setCashReceived("")
+      setBankName("")
+      setReceiptNumber("")
+      setNotes("")
     } catch (error) {
       const apiError = error as ApiError
 
@@ -183,6 +208,9 @@ export default function VentasProductosPage() {
         setSelectedProduct(null)
         setUnitPrice("")
         setCashReceived("")
+        setBankName("")
+        setReceiptNumber("")
+        setNotes("")
         alert("Producto no encontrado. Primero créalo en el módulo de Productos.")
         return
       }
@@ -238,6 +266,18 @@ export default function VentasProductosPage() {
         }
       }
 
+      if (paymentMethod === "TRANSFERENCIA") {
+        if (!bankName) {
+          alert("Selecciona el banco.")
+          return
+        }
+
+        if (!receiptNumber.trim()) {
+          alert("Ingresa el número de comprobante.")
+          return
+        }
+      }
+
       setSaving(true)
 
       await api.post("/api/product-sales", {
@@ -245,6 +285,10 @@ export default function VentasProductosPage() {
         quantity: Number(quantity),
         paymentMethod,
         unitPrice: Number(unitPrice),
+        bankName: paymentMethod === "TRANSFERENCIA" ? bankName : null,
+        receiptNumber:
+          paymentMethod === "TRANSFERENCIA" ? receiptNumber.trim() : null,
+        notes: notes || null,
       })
 
       await loadSales()
@@ -281,7 +325,9 @@ export default function VentasProductosPage() {
         sale.product?.name?.toLowerCase().includes(text) ||
         sale.product?.barcode?.toLowerCase().includes(text) ||
         sale.product?.category?.toLowerCase().includes(text) ||
-        sale.paymentMethod?.toLowerCase().includes(text)
+        sale.paymentMethod?.toLowerCase().includes(text) ||
+        sale.bankName?.toLowerCase().includes(text) ||
+        sale.receiptNumber?.toLowerCase().includes(text)
 
       return matchesDate && matchesSearch
     })
@@ -291,7 +337,6 @@ export default function VentasProductosPage() {
     (sum, sale) => sum + Number(sale.total || 0),
     0
   )
-
 
   const totalUnits = filteredSales.reduce(
     (sum, sale) => sum + Number(sale.quantity || 0),
@@ -453,8 +498,14 @@ export default function VentasProductosPage() {
                       value={paymentMethod}
                       onValueChange={(value) => {
                         setPaymentMethod(value)
+
                         if (value === "TRANSFERENCIA") {
                           setCashReceived("")
+                        }
+
+                        if (value === "EFECTIVO") {
+                          setBankName("")
+                          setReceiptNumber("")
                         }
                       }}
                     >
@@ -533,6 +584,47 @@ export default function VentasProductosPage() {
                   </div>
                 )}
 
+                {paymentMethod === "TRANSFERENCIA" && (
+                  <div className="mt-5 grid gap-4 md:grid-cols-3">
+                    <div className="space-y-2">
+                      <Label className="text-zinc-300">Banco</Label>
+                      <Select value={bankName} onValueChange={setBankName}>
+                        <SelectTrigger className="h-11 border-white/10 bg-[#0b0b0d] text-white">
+                          <SelectValue placeholder="Selecciona banco" />
+                        </SelectTrigger>
+
+                        <SelectContent className="border-white/10 bg-[#0b0b0d] text-white">
+                          {banks.map((bank) => (
+                            <SelectItem key={bank} value={bank}>
+                              {bank}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-zinc-300"># comprobante</Label>
+                      <Input
+                        value={receiptNumber}
+                        onChange={(e) => setReceiptNumber(e.target.value)}
+                        placeholder="Ej: 001234567"
+                        className="h-11 border-white/10 bg-[#0b0b0d] text-white placeholder:text-zinc-600"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-zinc-300">Nota opcional</Label>
+                      <Input
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        placeholder="Observación"
+                        className="h-11 border-white/10 bg-[#0b0b0d] text-white placeholder:text-zinc-600"
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <div className="mt-5 flex justify-end border-t border-white/10 pt-5">
                   <Button
                     type="button"
@@ -558,7 +650,8 @@ export default function VentasProductosPage() {
                 </CardTitle>
 
                 <p className="mt-1 text-sm text-zinc-400">
-                  Consulta ventas por fecha, producto, código o método de pago.
+                  Consulta ventas por fecha, producto, código, banco, comprobante
+                  o método de pago.
                 </p>
               </div>
 
@@ -628,6 +721,7 @@ export default function VentasProductosPage() {
                     <TableHead className="text-zinc-400">Fecha</TableHead>
                     <TableHead className="text-zinc-400">Producto</TableHead>
                     <TableHead className="text-zinc-400">Método</TableHead>
+                    <TableHead className="text-zinc-400">Comprobante</TableHead>
                     <TableHead className="text-right text-zinc-400">
                       Cantidad
                     </TableHead>
@@ -644,7 +738,7 @@ export default function VentasProductosPage() {
                   {loading ? (
                     <TableRow className="border-white/10">
                       <TableCell
-                        colSpan={6}
+                        colSpan={7}
                         className="py-8 text-center text-zinc-400"
                       >
                         Cargando ventas...
@@ -653,7 +747,7 @@ export default function VentasProductosPage() {
                   ) : filteredSales.length === 0 ? (
                     <TableRow className="border-white/10">
                       <TableCell
-                        colSpan={6}
+                        colSpan={7}
                         className="py-10 text-center text-zinc-400"
                       >
                         No hay ventas registradas para este filtro.
@@ -691,6 +785,14 @@ export default function VentasProductosPage() {
                           >
                             {sale.paymentMethod}
                           </Badge>
+                        </TableCell>
+
+                        <TableCell className="text-zinc-400">
+                          {sale.paymentMethod === "TRANSFERENCIA"
+                            ? `${sale.bankName || "-"} · #${
+                                sale.receiptNumber || "-"
+                              }`
+                            : "-"}
                         </TableCell>
 
                         <TableCell className="text-right font-bold text-white">
