@@ -44,9 +44,12 @@ function formatMoney(value) {
 function formatDate(value) {
   if (!value) return "-"
 
+  const dateKey = String(value).slice(0, 10)
+  const [year, month, day] = dateKey.split("-")
+
   return new Intl.DateTimeFormat("es-EC", {
     dateStyle: "medium",
-  }).format(new Date(value))
+  }).format(new Date(Number(year), Number(month) - 1, Number(day)))
 }
 
 function getTodayDate() {
