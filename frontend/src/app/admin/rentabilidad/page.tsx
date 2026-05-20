@@ -297,8 +297,7 @@ export default function AdminRentabilidadPage() {
 
           <Card className="border-white/10 bg-[#0b0b0d] text-white">
             <CardContent className="p-5">
-              <DollarSign className="h-5 w-5 text-[#ffd400]" />
-              <p className="mt-3 text-sm text-zinc-400">Utilidad neta</p>
+              <p className="text-sm text-zinc-400">Utilidad neta</p>
               <p className="mt-2 text-2xl font-bold text-emerald-300">
                 {loading ? "..." : formatMoney(totals.netProfit)}
               </p>
