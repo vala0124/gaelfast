@@ -14,7 +14,9 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
 
-    async function handleLogin() {
+  async function handleLogin() {
+    if (loading) return
+
     try {
       if (!email.trim()) {
         alert("Ingresa el correo.")
@@ -36,21 +38,16 @@ export default function LoginPage() {
       localStorage.setItem("token", res.data.token)
       localStorage.setItem("user", JSON.stringify(res.data.user))
 
-      if (res.data.user?.role === "ADMIN") {
-        window.location.href = "/admin"
-        return
-      }
-
-      window.location.href = "/dashboard"
+      window.location.href =
+        res.data.user?.role === "ADMIN" ? "/admin" : "/dashboard"
     } catch (error) {
       console.error(error)
-      alert(apiError.response?.data?.error || "No se pudo iniciar sesión.")
-    } finally {
+      alert(error.response?.data?.error || "No se pudo iniciar sesión.")
       setLoading(false)
     }
   }
 
-    function handleKeyDown(event) {
+  function handleKeyDown(event) {
     if (event.key === "Enter") {
       event.preventDefault()
       handleLogin()
@@ -94,6 +91,7 @@ export default function LoginPage() {
                   alt="GAELFAST"
                   fill
                   priority
+                  sizes="(max-width: 1024px) 100vw, 50vw"
                   className="object-cover"
                   style={{ mixBlendMode: "lighten" }}
                 />
@@ -147,6 +145,9 @@ export default function LoginPage() {
                   onKeyDown={handleKeyDown}
                   placeholder="correo@gaelfast.com"
                   autoComplete="email"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   className="h-12 border-white/10 bg-black text-white placeholder:text-zinc-600"
                 />
               </div>
@@ -162,6 +163,9 @@ export default function LoginPage() {
                     onKeyDown={handleKeyDown}
                     placeholder="••••••••"
                     autoComplete="current-password"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                     className="h-12 border-white/10 bg-black pr-12 text-white placeholder:text-zinc-600"
                   />
 
@@ -181,9 +185,18 @@ export default function LoginPage() {
 
               <Button
                 type="button"
-                onClick={handleLogin}
+                onClick={(event) => {
+                  event.preventDefault()
+                  event.currentTarget.blur()
+                  handleLogin()
+                }}
+                onTouchEnd={(event) => {
+                  event.preventDefault()
+                  event.currentTarget.blur()
+                  handleLogin()
+                }}
                 disabled={loading}
-                className="h-12 w-full bg-[#d90416] text-base font-semibold text-white hover:bg-[#ff1024]"
+                className="h-12 w-full touch-manipulation bg-[#d90416] text-base font-semibold text-white hover:bg-[#ff1024] disabled:opacity-60"
               >
                 {loading ? "Ingresando..." : "Entrar al sistema"}
               </Button>
