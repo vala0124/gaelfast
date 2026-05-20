@@ -133,7 +133,7 @@ export default function LoginPage() {
               </h2>
 
               <p className="mt-2 text-sm leading-6 text-zinc-400">
-                Ingresa con tu usuario autorizado para administrar GAELFAST.
+                Ingresa con tu usuario para administrar GAELFAST.
               </p>
             </div>
 
