@@ -10,8 +10,8 @@ export default function AppShell({ children, title = "Dashboard" }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white">
-      <div className="flex min-h-screen">
+    <div className="h-screen overflow-hidden bg-[#050505] text-white">
+      <div className="flex h-screen overflow-hidden">
         <Sidebar
           collapsed={sidebarCollapsed}
           onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -43,7 +43,7 @@ export default function AppShell({ children, title = "Dashboard" }) {
           </div>
         )}
 
-        <main className="flex-1 bg-[radial-gradient(circle_at_top_right,rgba(217,4,22,0.16),transparent_35%),#050505]">
+        <main className="flex h-screen flex-1 flex-col overflow-hidden bg-[radial-gradient(circle_at_top_right,rgba(217,4,22,0.16),transparent_35%),#050505]">
           <Header title={title} />
 
           <div className="border-b border-white/10 bg-black/40 px-5 py-3 md:hidden">
@@ -57,7 +57,9 @@ export default function AppShell({ children, title = "Dashboard" }) {
             </button>
           </div>
 
-          <section className="p-5 md:p-6">{children}</section>
+          <section className="flex-1 overflow-y-auto p-5 md:p-6">
+            {children}
+          </section>
         </main>
       </div>
     </div>

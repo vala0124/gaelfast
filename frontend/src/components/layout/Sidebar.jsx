@@ -59,8 +59,8 @@ export default function Sidebar({
   const menu = user?.role === "ADMIN" ? adminMenu : sellerMenu
 
   const asideClass = mobile
-    ? "block min-h-screen w-72 border-r border-white/10 bg-[#070707] p-4"
-    : `hidden min-h-screen border-r border-white/10 bg-[#070707] p-4 transition-all duration-300 md:block ${
+    ? "block h-screen w-72 overflow-y-auto border-r border-white/10 bg-[#070707] p-4"
+    : `hidden h-screen overflow-y-auto border-r border-white/10 bg-[#070707] p-4 transition-all duration-300 md:block ${
         collapsed ? "w-20" : "w-72"
       }`
 
