@@ -2,6 +2,8 @@
 
 import Image from "next/image"
 import { useState } from "react"
+import type { KeyboardEvent } from "react"
+import { Eye, EyeOff } from "lucide-react"
 import { api } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,6 +12,7 @@ import { Label } from "@/components/ui/label"
 export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
 
   async function handleLogin() {
@@ -27,19 +30,31 @@ export default function LoginPage() {
       setLoading(true)
 
       const res = await api.post("/api/auth/login", {
-        email,
+        email: email.trim(),
         password,
       })
 
       localStorage.setItem("token", res.data.token)
       localStorage.setItem("user", JSON.stringify(res.data.user))
 
+      if (res.data.user?.role === "ADMIN") {
+        window.location.href = "/admin"
+        return
+      }
+
       window.location.href = "/dashboard"
-    } catch (error) {
+    } catch (error: any) {
       console.error(error)
       alert(error.response?.data?.error || "No se pudo iniciar sesión.")
     } finally {
       setLoading(false)
+    }
+  }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Enter") {
+      event.preventDefault()
+      handleLogin()
     }
   }
 
@@ -130,6 +145,7 @@ export default function LoginPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  onKeyDown={handleKeyDown}
                   placeholder="correo@gaelfast.com"
                   autoComplete="email"
                   className="h-12 border-white/10 bg-black text-white placeholder:text-zinc-600"
@@ -138,14 +154,30 @@ export default function LoginPage() {
 
               <div className="space-y-2">
                 <Label className="text-zinc-300">Contraseña</Label>
-                <Input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  autoComplete="current-password"
-                  className="h-12 border-white/10 bg-black text-white placeholder:text-zinc-600"
-                />
+
+                <div className="relative">
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="••••••••"
+                    autoComplete="current-password"
+                    className="h-12 border-white/10 bg-black pr-12 text-white placeholder:text-zinc-600"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((current) => !current)}
+                    className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-white/10 hover:text-white"
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-5 w-5" />
+                    ) : (
+                      <Eye className="h-5 w-5" />
+                    )}
+                  </button>
+                </div>
               </div>
 
               <Button
