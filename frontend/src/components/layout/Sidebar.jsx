@@ -35,8 +35,8 @@ const adminMenu = [
   { label: "Admin Retiros", href: "/admin/retiros", icon: ReceiptText },
   { label: "Rentabilidad", href: "/admin/rentabilidad", icon: Calculator },
   { label: "Caja Admin", href: "/admin/caja", icon: ArrowDownUp },
+  { label: "Productos Stock", href: "/admin/productos", icon: Package },
   { label: "Usuarios", href: "/admin/usuarios", icon: Users },
-  ...sellerMenu,
 ]
 
 export default function Sidebar({
