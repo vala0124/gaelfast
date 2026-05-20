@@ -74,9 +74,7 @@ export default function CajaPage() {
   const [banks, setBanks] = useState([])
   const [dailyCashBox, setDailyCashBox] = useState(null)
   const [dailyCashBoxHistory, setDailyCashBoxHistory] = useState([])
-
   const [withdrawals, setWithdrawals] = useState([])
-  const [paymentForms, setPaymentForms] = useState({})
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -85,6 +83,14 @@ export default function CajaPage() {
 
   const [cashBoxForm, setCashBoxForm] = useState({
     salesInitialCash: "",
+    notes: "",
+  })
+
+  const [housePaymentForm, setHousePaymentForm] = useState({
+    withdrawalId: "",
+    amount: "",
+    paymentMethod: "EFECTIVO",
+    receiptNumber: "",
     notes: "",
   })
 
@@ -110,21 +116,16 @@ export default function CajaPage() {
           api.get("/api/banks"),
           api.get(`/api/daily-cash-box?date=${dateValue}`),
           api.get("/api/daily-cash-box/history"),
-          api.get(
-            `/api/withdrawals?startDate=${selectedDate}&endDate=${selectedDate}`
-          ),
+          api.get(`/api/withdrawals?startDate=${dateValue}&endDate=${dateValue}`),
         ])
-
-        const withdrawalsData = Array.isArray(withdrawalsRes.data)
-          ? withdrawalsRes.data
-          : []
-
-        setWithdrawals(withdrawalsData)
 
       const housesData = Array.isArray(housesRes.data) ? housesRes.data : []
       const banksData = Array.isArray(banksRes.data) ? banksRes.data : []
       const cashBoxData = cashBoxRes.data || null
       const historyData = Array.isArray(historyRes.data) ? historyRes.data : []
+      const withdrawalsData = Array.isArray(withdrawalsRes.data)
+        ? withdrawalsRes.data
+        : []
 
       setBetHouses(housesData)
       setBanks(banksData)
@@ -142,7 +143,13 @@ export default function CajaPage() {
       })
     } catch (error) {
       console.error(error)
-      alert("No se pudo cargar la caja. Revisa que el backend esté encendido.")
+
+      if (
+        localStorage.getItem("token") &&
+        localStorage.getItem("loggingOut") !== "true"
+      ) {
+        alert("No se pudo cargar la caja. Revisa que el backend esté encendido.")
+      }
     } finally {
       setLoading(false)
     }
@@ -180,6 +187,145 @@ export default function CajaPage() {
       initialBalance: "",
       notes: "",
     })
+  }
+
+  function setToday() {
+    setSelectedDate(today)
+  }
+
+  function openHistoryDate(dateValue) {
+    const dateKey = getDateKey(dateValue)
+
+    setSelectedDate(dateKey)
+    scrollToElement("fecha-caja")
+  }
+
+  const houseCashBoxes = dailyCashBox?.houseCashBoxes || []
+  const bankCashBoxes = dailyCashBox?.bankCashBoxes || []
+
+  const pendingWithdrawals = useMemo(() => {
+    return withdrawals.filter((item) => {
+      return item.status !== "COMPENSADO" && item.status !== "ANULADO"
+    })
+  }, [withdrawals])
+
+  const selectedWithdrawal = useMemo(() => {
+    return pendingWithdrawals.find(
+      (item) => String(item.id) === String(housePaymentForm.withdrawalId)
+    )
+  }, [pendingWithdrawals, housePaymentForm.withdrawalId])
+
+  const totalHouseInitialBalance = useMemo(() => {
+    return houseCashBoxes.reduce(
+      (sum, item) => sum + Number(item.initialBalance || 0),
+      0
+    )
+  }, [houseCashBoxes])
+
+  const totalBankInitialBalance = useMemo(() => {
+    return bankCashBoxes.reduce(
+      (sum, item) => sum + Number(item.initialBalance || 0),
+      0
+    )
+  }, [bankCashBoxes])
+
+  const totalOpening = useMemo(() => {
+    return (
+      Number(dailyCashBox?.salesInitialCash || 0) +
+      Number(totalHouseInitialBalance || 0) +
+      Number(totalBankInitialBalance || 0)
+    )
+  }, [dailyCashBox, totalHouseInitialBalance, totalBankInitialBalance])
+
+  const selectedHouseName = useMemo(() => {
+    const house = betHouses.find(
+      (item) => String(item.id) === String(houseForm.betHouseId)
+    )
+
+    return house?.name || "-"
+  }, [betHouses, houseForm.betHouseId])
+
+  const selectedBankName = useMemo(() => {
+    const bank = banks.find((item) => String(item.id) === String(bankForm.bankId))
+
+    return bank?.name || "-"
+  }, [banks, bankForm.bankId])
+
+  const missingHouses = useMemo(() => {
+    const registeredIds = new Set(
+      houseCashBoxes.map((item) => String(item.betHouseId))
+    )
+
+    return betHouses.filter((house) => !registeredIds.has(String(house.id)))
+  }, [betHouses, houseCashBoxes])
+
+  const missingBanks = useMemo(() => {
+    const registeredIds = new Set(
+      bankCashBoxes.map((item) => String(item.bankId))
+    )
+
+    return banks.filter((bank) => !registeredIds.has(String(bank.id)))
+  }, [banks, bankCashBoxes])
+
+  function selectPendingWithdrawal(id) {
+    const withdrawal = pendingWithdrawals.find(
+      (item) => String(item.id) === String(id)
+    )
+
+    setHousePaymentForm({
+      withdrawalId: String(id),
+      amount: String(withdrawal?.amount || ""),
+      paymentMethod: "EFECTIVO",
+      receiptNumber: withdrawal?.receiptNumber || "",
+      notes: `Pago de casa por retiro #${id}`,
+    })
+  }
+
+  async function saveSelectedHousePayment() {
+    try {
+      const withdrawal = pendingWithdrawals.find(
+        (item) => String(item.id) === String(housePaymentForm.withdrawalId)
+      )
+
+      if (!withdrawal) {
+        alert("Selecciona un retiro pendiente.")
+        return
+      }
+
+      if (!housePaymentForm.amount || Number(housePaymentForm.amount) <= 0) {
+        alert("Ingresa el valor pagado por la casa.")
+        return
+      }
+
+      setSaving(true)
+
+      await api.post("/api/cash", {
+        type: "INGRESO",
+        amount: Number(housePaymentForm.amount),
+        paymentMethod: housePaymentForm.paymentMethod,
+        receiptNumber: housePaymentForm.receiptNumber || null,
+        notes:
+          housePaymentForm.notes || `Pago de casa por retiro #${withdrawal.id}`,
+        betHouseId: withdrawal.betHouseId,
+        withdrawalId: withdrawal.id,
+      })
+
+      setHousePaymentForm({
+        withdrawalId: "",
+        amount: "",
+        paymentMethod: "EFECTIVO",
+        receiptNumber: "",
+        notes: "",
+      })
+
+      await loadData(selectedDate)
+      alert("Pago de casa registrado correctamente.")
+    } catch (error) {
+      console.error(error)
+      alert(error.response?.data?.error || "Error registrando pago de casa.")
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function saveDailyCashBox() {
@@ -321,120 +467,6 @@ export default function CajaPage() {
     scrollToElement("form-saldo-banco")
   }
 
-  function setToday() {
-    setSelectedDate(today)
-  }
-
-  function openHistoryDate(dateValue) {
-    const dateKey = getDateKey(dateValue)
-
-    setSelectedDate(dateKey)
-    scrollToElement("fecha-caja")
-  }
-
-  const houseCashBoxes = dailyCashBox?.houseCashBoxes || []
-  const bankCashBoxes = dailyCashBox?.bankCashBoxes || []
-
-  const totalHouseInitialBalance = useMemo(() => {
-    return houseCashBoxes.reduce(
-      (sum, item) => sum + Number(item.initialBalance || 0),
-      0
-    )
-  }, [houseCashBoxes])
-
-  const totalBankInitialBalance = useMemo(() => {
-    return bankCashBoxes.reduce(
-      (sum, item) => sum + Number(item.initialBalance || 0),
-      0
-    )
-  }, [bankCashBoxes])
-
-  const totalOpening = useMemo(() => {
-    return (
-      Number(dailyCashBox?.salesInitialCash || 0) +
-      Number(totalHouseInitialBalance || 0) +
-      Number(totalBankInitialBalance || 0)
-    )
-  }, [dailyCashBox, totalHouseInitialBalance, totalBankInitialBalance])
-
-  const selectedHouseName = useMemo(() => {
-    const house = betHouses.find(
-      (item) => String(item.id) === String(houseForm.betHouseId)
-    )
-
-    return house?.name || "-"
-  }, [betHouses, houseForm.betHouseId])
-
-  const selectedBankName = useMemo(() => {
-    const bank = banks.find((item) => String(item.id) === String(bankForm.bankId))
-
-    return bank?.name || "-"
-  }, [banks, bankForm.bankId])
-
-  const missingHouses = useMemo(() => {
-    const registeredIds = new Set(
-      houseCashBoxes.map((item) => String(item.betHouseId))
-    )
-
-    return betHouses.filter((house) => !registeredIds.has(String(house.id)))
-  }, [betHouses, houseCashBoxes])
-
-  const missingBanks = useMemo(() => {
-    const registeredIds = new Set(
-      bankCashBoxes.map((item) => String(item.bankId))
-    )
-
-    return banks.filter((bank) => !registeredIds.has(String(bank.id)))
-  }, [banks, bankCashBoxes])
-
-  const pendingWithdrawals = useMemo(() => {
-    return withdrawals.filter((item) => {
-      const dateKey = getDateKey(item.createdAt)
-
-      return (
-        dateKey === selectedDate &&
-        item.status !== "COMPENSADO" &&
-        item.status !== "ANULADO"
-      )
-    })
-  }, [withdrawals, selectedDate])
-
-  async function saveHousePayment(withdrawal) {
-    try {
-      const value = paymentForms[withdrawal.id] || withdrawal.amount
-
-      if (!value || Number(value) <= 0) {
-        alert("Ingresa el valor pagado por la casa.")
-        return
-      }
-
-      setSaving(true)
-
-      await api.post("/api/cash", {
-        type: "INGRESO",
-        amount: Number(value),
-        paymentMethod: "EFECTIVO",
-        receiptNumber: withdrawal.receiptNumber || null,
-        notes: `Pago de casa por retiro #${withdrawal.id}`,
-        betHouseId: withdrawal.betHouseId,
-        withdrawalId: withdrawal.id,
-      })
-
-      setPaymentForms((current) => ({
-        ...current,
-        [withdrawal.id]: "",
-      }))
-
-      await loadData(selectedDate)
-      alert("Pago de casa registrado correctamente.")
-    } catch (error) {
-      console.error(error)
-      alert(error.response?.data?.error || "Error registrando pago de casa.")
-    } finally {
-      setSaving(false)
-    }
-  }
-
   return (
     <AppShell title="Caja">
       <div className="space-y-6">
@@ -450,9 +482,8 @@ export default function CajaPage() {
               </h1>
 
               <p className="mt-2 max-w-3xl text-sm text-white/75">
-                Registra el dinero con el que inicia la jornada: caja de ventas,
-                saldos iniciales de bancos y saldos iniciales por cada casa de
-                apuestas. El cierre final se realiza en el módulo de Cuadre.
+                Registra pagos de casas, caja inicial de ventas, bancos y saldos
+                iniciales por casa. El cierre final se realiza en Cuadre.
               </p>
             </div>
 
@@ -461,6 +492,148 @@ export default function CajaPage() {
             </div>
           </div>
         </div>
+
+        <Card className="border-white/10 bg-[#0b0b0d] text-white shadow-2xl">
+          <CardHeader className="border-b border-white/10">
+            <CardTitle className="flex items-center gap-2 text-xl font-bold">
+              <Landmark className="h-5 w-5 text-[#ffd400]" />
+              Registrar pago de casa
+            </CardTitle>
+
+            <p className="text-sm text-zinc-400">
+              Selecciona el retiro pendiente, confirma cuánto pagó la casa y
+              registra el medio de pago.
+            </p>
+          </CardHeader>
+
+          <CardContent className="p-6">
+            <div className="grid gap-4 xl:grid-cols-[1.5fr_180px_180px_1fr]">
+              <div className="space-y-2">
+                <Label className="text-zinc-300">Retiro pendiente</Label>
+                <Select
+                  value={housePaymentForm.withdrawalId}
+                  onValueChange={selectPendingWithdrawal}
+                >
+                  <SelectTrigger className="h-11 border-white/10 bg-black text-white">
+                    <SelectValue placeholder="Selecciona retiro" />
+                  </SelectTrigger>
+
+                  <SelectContent className="border-white/10 bg-[#0b0b0d] text-white">
+                    {pendingWithdrawals.length === 0 ? (
+                      <SelectItem value="SIN_RETIROS" disabled>
+                        Sin retiros pendientes
+                      </SelectItem>
+                    ) : (
+                      pendingWithdrawals.map((item) => (
+                        <SelectItem key={item.id} value={String(item.id)}>
+                          #{item.id} · {item.client?.name || "-"} ·{" "}
+                          {item.betHouse?.name || "-"} ·{" "}
+                          {formatMoney(item.amount)}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-zinc-300">Monto pagado</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={housePaymentForm.amount}
+                  onChange={(e) =>
+                    setHousePaymentForm({
+                      ...housePaymentForm,
+                      amount: e.target.value,
+                    })
+                  }
+                  placeholder="0.00"
+                  className="h-11 border-white/10 bg-black text-white"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-zinc-300">Medio de pago</Label>
+                <Select
+                  value={housePaymentForm.paymentMethod}
+                  onValueChange={(value) =>
+                    setHousePaymentForm({
+                      ...housePaymentForm,
+                      paymentMethod: value,
+                    })
+                  }
+                >
+                  <SelectTrigger className="h-11 border-white/10 bg-black text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+
+                  <SelectContent className="border-white/10 bg-[#0b0b0d] text-white">
+                    <SelectItem value="EFECTIVO">Efectivo</SelectItem>
+                    <SelectItem value="TRANSFERENCIA">Transferencia</SelectItem>
+                    <SelectItem value="BANCO">Banco</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-zinc-300">Comprobante</Label>
+                <Input
+                  value={housePaymentForm.receiptNumber}
+                  onChange={(e) =>
+                    setHousePaymentForm({
+                      ...housePaymentForm,
+                      receiptNumber: e.target.value,
+                    })
+                  }
+                  placeholder="Opcional"
+                  className="h-11 border-white/10 bg-black text-white"
+                />
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_auto]">
+              <div className="space-y-2">
+                <Label className="text-zinc-300">Observación</Label>
+                <Input
+                  value={housePaymentForm.notes}
+                  onChange={(e) =>
+                    setHousePaymentForm({
+                      ...housePaymentForm,
+                      notes: e.target.value,
+                    })
+                  }
+                  placeholder="Ej: Pago recibido de la casa por retiro pendiente"
+                  className="h-11 border-white/10 bg-black text-white"
+                />
+              </div>
+
+              <div className="flex items-end">
+                <Button
+                  type="button"
+                  onClick={saveSelectedHousePayment}
+                  disabled={saving}
+                  className="h-11 w-full bg-[#d90416] px-8 font-bold text-white hover:bg-[#ff1024] lg:w-auto"
+                >
+                  <Save className="mr-2 h-4 w-4" />
+                  Registrar pago
+                </Button>
+              </div>
+            </div>
+
+            {selectedWithdrawal && (
+              <div className="mt-4 rounded-2xl border border-[#ffd400]/20 bg-[#ffd400]/10 p-4 text-sm text-[#ffd400]">
+                Seleccionado:{" "}
+                <span className="font-bold">
+                  {selectedWithdrawal.client?.name || "-"} ·{" "}
+                  {selectedWithdrawal.betHouse?.name || "-"} ·{" "}
+                  {formatMoney(selectedWithdrawal.amount)}
+                </span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <Card
           id="fecha-caja"
@@ -568,92 +741,6 @@ export default function CajaPage() {
             </CardContent>
           </Card>
         </div>
-
-        <Card className="border-white/10 bg-[#0b0b0d] text-white shadow-2xl">
-          <CardHeader className="border-b border-white/10">
-            <CardTitle className="flex items-center gap-2 text-xl font-bold">
-              <Building2 className="h-5 w-5 text-[#ffd400]" />
-              Saldos iniciales de bancos
-            </CardTitle>
-
-            <p className="text-sm text-zinc-400">
-              Dinero inicial registrado en cada cuenta bancaria al iniciar la
-              jornada.
-            </p>
-          </CardHeader>
-
-          <CardContent className="p-6">
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {banks.map((bank) => {
-                const balance = bankCashBoxes.find(
-                  (item) => String(item.bankId) === String(bank.id)
-                )
-
-                return (
-                  <Card
-                    key={bank.id}
-                    className="border-white/10 bg-black text-white"
-                  >
-                    <CardContent className="p-5">
-                      <p className="text-sm text-zinc-400">{bank.name}</p>
-
-                      <p className="mt-2 text-2xl font-bold text-[#ffd400]">
-                        {formatMoney(balance?.initialBalance)}
-                      </p>
-
-                      <p className="mt-1 text-xs text-zinc-500">
-                        Saldo inicial banco
-                      </p>
-                    </CardContent>
-                  </Card>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-white/10 bg-[#0b0b0d] text-white shadow-2xl">
-          <CardHeader className="border-b border-white/10">
-            <CardTitle className="flex items-center gap-2 text-xl font-bold">
-              <Landmark className="h-5 w-5 text-[#ffd400]" />
-              Saldos iniciales de casas
-            </CardTitle>
-
-            <p className="text-sm text-zinc-400">
-              Saldo inicial registrado para cada casa de apuestas al iniciar la
-              jornada.
-            </p>
-          </CardHeader>
-
-          <CardContent className="p-6">
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              {betHouses.map((house) => {
-                const balance = houseCashBoxes.find(
-                  (item) => String(item.betHouseId) === String(house.id)
-                )
-
-                return (
-                  <Card
-                    key={house.id}
-                    className="border-white/10 bg-black text-white"
-                  >
-                    <CardContent className="p-5">
-                      <p className="text-sm text-zinc-400">{house.name}</p>
-
-                      <p className="mt-2 text-2xl font-bold text-[#ffd400]">
-                        {formatMoney(balance?.initialBalance)}
-                      </p>
-
-                      <p className="mt-1 text-xs text-zinc-500">
-                        Saldo inicial casa
-                      </p>
-                    </CardContent>
-                  </Card>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
 
         <Card className="border-white/10 bg-[#0b0b0d] text-white shadow-2xl">
           <CardHeader className="border-b border-white/10">
@@ -1123,108 +1210,6 @@ export default function CajaPage() {
             </div>
           </CardContent>
         </Card>
-
-
-        <Card className="border-white/10 bg-[#0b0b0d] text-white shadow-2xl">
-  <CardHeader className="border-b border-white/10">
-    <CardTitle className="flex items-center gap-2 text-xl font-bold">
-      <Landmark className="h-5 w-5 text-[#ffd400]" />
-      Pagos pendientes de casas
-    </CardTitle>
-
-    <p className="text-sm text-zinc-400">
-      Aquí registras cuando la casa paga un retiro pendiente.
-    </p>
-  </CardHeader>
-
-  <CardContent className="p-6">
-    <div className="overflow-hidden rounded-2xl border border-white/10">
-      <Table>
-        <TableHeader>
-          <TableRow className="border-white/10 bg-white/[0.03]">
-            <TableHead className="text-zinc-400">ID</TableHead>
-            <TableHead className="text-zinc-400">Cliente</TableHead>
-            <TableHead className="text-zinc-400">Casa</TableHead>
-            <TableHead className="text-right text-zinc-400">Retiro</TableHead>
-            <TableHead className="text-right text-zinc-400">
-              Pago casa
-            </TableHead>
-            <TableHead className="text-zinc-400">Estado</TableHead>
-            <TableHead className="text-right text-zinc-400">Acción</TableHead>
-          </TableRow>
-        </TableHeader>
-
-        <TableBody>
-          {pendingWithdrawals.length === 0 ? (
-            <TableRow className="border-white/10">
-              <TableCell
-                colSpan={7}
-                className="py-10 text-center text-zinc-400"
-              >
-                No hay retiros pendientes para esta fecha.
-              </TableCell>
-            </TableRow>
-          ) : (
-            pendingWithdrawals.map((item) => (
-              <TableRow key={item.id} className="border-white/10">
-                <TableCell className="font-bold">{item.id}</TableCell>
-
-                <TableCell>
-                  <p className="font-medium text-white">
-                    {item.client?.name || "-"}
-                  </p>
-                  <p className="text-xs text-zinc-500">
-                    {item.client?.cedula || "-"}
-                  </p>
-                </TableCell>
-
-                <TableCell>{item.betHouse?.name || "-"}</TableCell>
-
-                <TableCell className="text-right font-bold text-[#ffd400]">
-                  {formatMoney(item.amount)}
-                </TableCell>
-
-                <TableCell className="text-right">
-                  <Input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={paymentForms[item.id] ?? String(item.amount || "")}
-                    onChange={(e) =>
-                      setPaymentForms((current) => ({
-                        ...current,
-                        [item.id]: e.target.value,
-                      }))
-                    }
-                    className="ml-auto h-9 max-w-[130px] border-white/10 bg-black text-right text-white"
-                  />
-                </TableCell>
-
-                <TableCell>
-                  <Badge className="bg-[#ffd400]/15 text-[#ffd400]">
-                    {item.status}
-                  </Badge>
-                </TableCell>
-
-                <TableCell className="text-right">
-                  <Button
-                    type="button"
-                    onClick={() => saveHousePayment(item)}
-                    disabled={saving}
-                    className="h-9 bg-[#d90416] font-bold text-white hover:bg-[#ff1024]"
-                  >
-                    <Save className="mr-2 h-4 w-4" />
-                    Registrar pago
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
-    </div>
-  </CardContent>
-</Card>
 
         <Card className="border-white/10 bg-[#0b0b0d] text-white shadow-2xl">
           <CardHeader className="border-b border-white/10">
