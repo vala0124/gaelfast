@@ -110,7 +110,9 @@ export default function CajaPage() {
           api.get("/api/banks"),
           api.get(`/api/daily-cash-box?date=${dateValue}`),
           api.get("/api/daily-cash-box/history"),
-          api.get("/api/withdrawals"),
+          api.get(
+            `/api/withdrawals?startDate=${selectedDate}&endDate=${selectedDate}`
+          ),
         ])
 
         const withdrawalsData = Array.isArray(withdrawalsRes.data)

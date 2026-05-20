@@ -73,7 +73,9 @@ export default function AdminCajaPage() {
       setLoading(true)
 
       const cashBoxesRes = await api.get("/api/daily-cash-box/history")
-      const closingsRes = await api.get("/api/cash-closings")
+      const closingsRes = await api.get(
+        `/api/cash-closings?startDate=${startDate}&endDate=${endDate}`
+      )
 
       setCashBoxes(Array.isArray(cashBoxesRes.data) ? cashBoxesRes.data : [])
       setClosings(Array.isArray(closingsRes.data) ? closingsRes.data : [])

@@ -162,10 +162,10 @@ export default function CuadrePage() {
         salesRes,
       ] = await Promise.all([
         api.get(`/api/daily-cash-box?date=${dateValue}`),
-        api.get("/api/recharges"),
-        api.get("/api/withdrawals"),
-        api.get("/api/cash"),
-        api.get("/api/product-sales"),
+        api.get(`/api/recharges?startDate=${selectedDate}&endDate=${selectedDate}`),
+        api.get(`/api/withdrawals?startDate=${selectedDate}&endDate=${selectedDate}`),
+        api.get(`/api/cash?startDate=${selectedDate}&endDate=${selectedDate}`),
+        api.get(`/api/product-sales?startDate=${selectedDate}&endDate=${selectedDate}`),
       ])
 
       setDailyCashBox(dailyCashBoxRes.data || null)
@@ -177,7 +177,9 @@ export default function CuadrePage() {
       setProductSales(Array.isArray(salesRes.data) ? salesRes.data : [])
 
       try {
-        const closingsRes = await api.get("/api/cash-closings")
+        const closingsRes = await api.get(
+          `/api/cash-closings?startDate=${selectedDate}&endDate=${selectedDate}`
+        )
         setClosings(Array.isArray(closingsRes.data) ? closingsRes.data : [])
       } catch {
         setClosings([])

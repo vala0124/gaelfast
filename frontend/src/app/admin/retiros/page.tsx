@@ -63,7 +63,9 @@ export default function AdminRetirosPage() {
     try {
       setLoading(true)
 
-      const res = await api.get("/api/withdrawals")
+      const res = await api.get(
+        `/api/withdrawals?startDate=${startDate}&endDate=${endDate}`
+      )
       const data = Array.isArray(res.data) ? res.data : []
 
       setWithdrawals(data)

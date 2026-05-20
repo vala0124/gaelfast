@@ -143,7 +143,9 @@ export default function VentasProductosPage() {
     try {
       setLoading(true)
 
-      const res = await api.get("/api/product-sales")
+      const res = await api.get(
+        `/api/product-sales?startDate=${startDate}&endDate=${endDate}`
+      )
       setSales(Array.isArray(res.data) ? res.data : [])
     } catch (error) {
       console.error(error)

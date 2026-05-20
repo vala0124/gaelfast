@@ -69,9 +69,15 @@ export default function AdminRentabilidadPage() {
     try {
       setLoading(true)
 
-      const salesRes = await api.get("/api/product-sales")
-      const rechargesRes = await api.get("/api/recharges")
-      const withdrawalsRes = await api.get("/api/withdrawals")
+      const salesRes = await api.get(
+        `/api/product-sales?startDate=${startDate}&endDate=${endDate}`
+      )
+      const rechargesRes = await api.get(
+        `/api/recharges?startDate=${startDate}&endDate=${endDate}`
+      )
+      const withdrawalsRes = await api.get(
+        `/api/withdrawals?startDate=${startDate}&endDate=${endDate}`
+      )
 
       setProductSales(Array.isArray(salesRes.data) ? salesRes.data : [])
       setRecharges(Array.isArray(rechargesRes.data) ? rechargesRes.data : [])

@@ -19,6 +19,28 @@ function toNumber(value) {
   return Number.isFinite(number) ? number : 0
 }
 
+function buildDateWhere(startDate, endDate) {
+  if (!startDate || !endDate) return {}
+
+  return {
+    createdAt: {
+      gte: new Date(`${startDate}T00:00:00`),
+      lte: new Date(`${endDate}T23:59:59`),
+    },
+  }
+}
+
+function buildClosingDateWhere(startDate, endDate) {
+  if (!startDate || !endDate) return {}
+
+  return {
+    closingDate: {
+      gte: new Date(`${startDate}T00:00:00`),
+      lte: new Date(`${endDate}T23:59:59`),
+    },
+  }
+}
+
 function generateToken(user) {
   return jwt.sign(
     {
@@ -900,7 +922,11 @@ app.post("/api/commission-settings", async (req, res) => {
 ========================= */
 app.get("/api/recharges", async (req, res) => {
   try {
+    const { startDate, endDate } = req.query
+    const where = buildDateWhere(startDate, endDate)
+
     const recharges = await prisma.recharge.findMany({
+      where,
       orderBy: { createdAt: "desc" },
       include: {
         client: true,
@@ -1073,7 +1099,11 @@ app.patch("/api/recharges/:id/profit", async (req, res) => {
 ========================= */
 app.get("/api/withdrawals", async (req, res) => {
   try {
+    const { startDate, endDate } = req.query
+    const where = buildDateWhere(startDate, endDate)
+
     const withdrawals = await prisma.withdrawal.findMany({
+      where,
       orderBy: { createdAt: "desc" },
       include: {
         client: true,
@@ -1678,7 +1708,11 @@ app.post("/api/daily-cash-box/bank", async (req, res) => {
 ========================= */
 app.get("/api/cash", async (req, res) => {
   try {
+    const { startDate, endDate } = req.query
+    const where = buildDateWhere(startDate, endDate)
+
     const entries = await prisma.cashEntry.findMany({
+      where,
       orderBy: { createdAt: "desc" },
       include: {
         betHouse: true,
@@ -1998,7 +2032,11 @@ app.post("/api/products/:id/add-stock", async (req, res) => {
 ========================= */
 app.get("/api/product-sales", async (req, res) => {
   try {
+    const { startDate, endDate } = req.query
+    const where = buildDateWhere(startDate, endDate)
+
     const sales = await prisma.productSale.findMany({
+      where,
       orderBy: { createdAt: "desc" },
       include: {
         product: true,
@@ -2119,7 +2157,11 @@ app.post("/api/product-sales", async (req, res) => {
 ========================= */
 app.get("/api/cash-closings", async (req, res) => {
   try {
+    const { startDate, endDate } = req.query
+    const where = buildClosingDateWhere(startDate, endDate)
+
     const closings = await prisma.cashClosing.findMany({
+      where,
       orderBy: {
         closingDate: "desc",
       },
@@ -2133,7 +2175,6 @@ app.get("/api/cash-closings", async (req, res) => {
     })
   }
 })
-
 app.post("/api/cash-closings", async (req, res) => {
   try {
     const {

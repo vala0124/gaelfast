@@ -63,7 +63,9 @@ export default function AdminRecargasPage() {
     try {
       setLoading(true)
 
-      const res = await api.get("/api/recharges")
+      const res = await api.get(
+        `/api/recharges?startDate=${startDate}&endDate=${endDate}`
+      )
       const data = Array.isArray(res.data) ? res.data : []
 
       setRecharges(data)

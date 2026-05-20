@@ -125,7 +125,7 @@ export default function RetirosPage() {
       const [clientsRes, housesRes, withdrawalsRes] = await Promise.all([
         api.get("/api/clients"),
         api.get("/api/bet-houses"),
-        api.get("/api/withdrawals"),
+        api.get(`/api/withdrawals?startDate=${startDate}&endDate=${endDate}`),
       ])
 
       setClients(Array.isArray(clientsRes.data) ? clientsRes.data : [])

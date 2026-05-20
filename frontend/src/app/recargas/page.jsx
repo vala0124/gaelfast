@@ -122,7 +122,7 @@ export default function RecargasPage() {
           api.get("/api/clients"),
           api.get("/api/bet-houses"),
           api.get("/api/banks"),
-          api.get("/api/recharges"),
+          api.get(`/api/recharges?startDate=${startDate}&endDate=${endDate}`),
         ])
 
       setClients(Array.isArray(clientsRes.data) ? clientsRes.data : [])
