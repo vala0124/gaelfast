@@ -210,7 +210,7 @@ export default function AdminPage() {
                   </div>
                 </CardHeader>
 
-                <CardContent>
+                <CardContent className="p-5">
                   <p className="text-3xl font-black">
                     {loading ? "..." : item.value}
                   </p>
@@ -276,7 +276,9 @@ export default function AdminPage() {
 
         <Card className="border-white/10 bg-[#0b0b0d] text-white shadow-2xl">
           <CardHeader className="border-b border-white/10">
-            <CardTitle>Estado del cuadre de hoy</CardTitle>
+            <CardTitle className="text-xl font-bold">
+              Estado del cuadre de hoy
+            </CardTitle>
           </CardHeader>
 
           <CardContent className="p-6">
@@ -319,7 +321,9 @@ export default function AdminPage() {
 
         <Card className="border-white/10 bg-[#0b0b0d] text-white shadow-2xl">
           <CardHeader className="border-b border-white/10">
-            <CardTitle>Alertas rápidas</CardTitle>
+            <CardTitle className="text-xl font-bold">
+              Alertas rápidas
+            </CardTitle>
           </CardHeader>
 
           <CardContent className="space-y-3 p-6">
