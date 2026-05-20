@@ -83,6 +83,13 @@ app.post("/api/auth/login", async (req, res) => {
       })
     }
 
+    if (!user.active) {
+      return res.status(403).json({
+        error: "Usuario desactivado. Contacta al administrador.",
+      })
+    }
+
+
     const validPassword = await bcrypt.compare(password, user.password)
 
     if (!validPassword) {
@@ -143,6 +150,21 @@ app.get("/api/users", async (req, res) => {
   }
 })
 
+app.delete("/api/users/email/:email", async (req, res) => {
+  try {
+    const email = String(req.params.email || "").trim().toLowerCase()
+
+    await prisma.user.delete({
+      where: { email },
+    })
+
+    res.json({ message: "Usuario eliminado correctamente" })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ error: "Error eliminando usuario" })
+  }
+})
+
 app.post("/api/users/sellers", async (req, res) => {
   try {
     const { name, email, password } = req.body
@@ -186,6 +208,64 @@ app.post("/api/users/sellers", async (req, res) => {
     res.status(500).json({
       error: "Error creando vendedor",
     })
+  }
+})
+
+app.patch("/api/users/:id/status", async (req, res) => {
+  try {
+    const userId = Number(req.params.id)
+    const { active } = req.body
+
+    if (!userId) {
+      return res.status(400).json({ error: "ID inválido" })
+    }
+
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: { active: Boolean(active) },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        active: true,
+        createdAt: true,
+      },
+    })
+
+    res.json(user)
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ error: "Error actualizando estado" })
+  }
+})
+
+app.patch("/api/users/:id/password", async (req, res) => {
+  try {
+    const userId = Number(req.params.id)
+    const { password } = req.body
+
+    if (!userId) {
+      return res.status(400).json({ error: "ID inválido" })
+    }
+
+    if (!password || String(password).trim().length < 4) {
+      return res.status(400).json({
+        error: "La contraseña debe tener al menos 4 caracteres",
+      })
+    }
+
+    const hashed = await bcrypt.hash(String(password), 10)
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { password: hashed },
+    })
+
+    res.json({ message: "Contraseña actualizada correctamente" })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ error: "Error actualizando contraseña" })
   }
 })
 
