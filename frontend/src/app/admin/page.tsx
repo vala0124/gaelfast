@@ -1,73 +1,178 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import AppShell from "@/components/layout/AppShell"
 import { api } from "@/lib/api"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import { Save, ShieldCheck, Users } from "lucide-react"
+  ArrowDownUp,
+  Banknote,
+  DollarSign,
+  Package,
+  ReceiptText,
+  TrendingUp,
+  Wallet,
+} from "lucide-react"
+
+function formatMoney(value: number | string | null | undefined) {
+  const number = Number(value || 0)
+
+  return new Intl.NumberFormat("es-EC", {
+    style: "currency",
+    currency: "USD",
+  }).format(number)
+}
+
+function getTodayDate() {
+  const today = new Date()
+  const year = today.getFullYear()
+  const month = String(today.getMonth() + 1).padStart(2, "0")
+  const day = String(today.getDate()).padStart(2, "0")
+
+  return `${year}-${month}-${day}`
+}
+
+function isToday(dateValue: string) {
+  if (!dateValue) return false
+
+  const itemDate = new Date(dateValue)
+  const today = getTodayDate()
+  const start = new Date(`${today}T00:00:00`)
+  const end = new Date(`${today}T23:59:59`)
+
+  return itemDate >= start && itemDate <= end
+}
 
 export default function AdminPage() {
-  const [users, setUsers] = useState([])
-  const [saving, setSaving] = useState(false)
+  const [dashboard, setDashboard] = useState<any>(null)
+  const [recharges, setRecharges] = useState<any[]>([])
+  const [withdrawals, setWithdrawals] = useState<any[]>([])
+  const [productSales, setProductSales] = useState<any[]>([])
+  const [closings, setClosings] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    password: "",
-  })
+  async function loadData() {
+    try {
+      setLoading(true)
 
-  async function loadUsers() {
-    const res = await api.get("/api/users")
-    setUsers(Array.isArray(res.data) ? res.data : [])
+      const [dashboardRes, rechargesRes, withdrawalsRes, salesRes, closingsRes] =
+        await Promise.all([
+          api.get("/api/dashboard"),
+          api.get("/api/recharges"),
+          api.get("/api/withdrawals"),
+          api.get("/api/product-sales"),
+          api.get("/api/cash-closings"),
+        ])
+
+      setDashboard(dashboardRes.data || null)
+      setRecharges(Array.isArray(rechargesRes.data) ? rechargesRes.data : [])
+      setWithdrawals(
+        Array.isArray(withdrawalsRes.data) ? withdrawalsRes.data : []
+      )
+      setProductSales(Array.isArray(salesRes.data) ? salesRes.data : [])
+      setClosings(Array.isArray(closingsRes.data) ? closingsRes.data : [])
+    } catch (error) {
+      console.error(error)
+      alert("No se pudo cargar el panel admin.")
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
-    loadUsers()
+    loadData()
   }, [])
 
-  async function createSeller() {
-    try {
-      if (!form.name.trim() || !form.email.trim() || !form.password.trim()) {
-        alert("Nombre, correo y contraseña son obligatorios.")
-        return
-      }
+  const todayData = useMemo(() => {
+    const todayRecharges = recharges.filter((item) => isToday(item.createdAt))
+    const todayWithdrawals = withdrawals.filter((item) => isToday(item.createdAt))
+    const todaySales = productSales.filter((item) => isToday(item.createdAt))
 
-      setSaving(true)
+    const totalRechargeProfit = todayRecharges.reduce(
+      (sum, item) => sum + Number(item.adminProfit || 0),
+      0
+    )
 
-      await api.post("/api/users/sellers", {
-        name: form.name,
-        email: form.email,
-        password: form.password,
-      })
+    const totalWithdrawalProfit = todayWithdrawals.reduce(
+      (sum, item) => sum + Number(item.adminProfit || 0),
+      0
+    )
 
-      setForm({
-        name: "",
-        email: "",
-        password: "",
-      })
+    const totalProductSales = todaySales.reduce(
+      (sum, item) => sum + Number(item.total || 0),
+      0
+    )
 
-      await loadUsers()
-      alert("Vendedor creado correctamente.")
-    } catch (error: any) {
-      console.error(error)
-      alert(error.response?.data?.error || "Error creando vendedor.")
-    } finally {
-      setSaving(false)
+    const totalProductCost = todaySales.reduce((sum, item) => {
+      const cost = Number(item.product?.purchasePrice || 0)
+      const quantity = Number(item.quantity || 0)
+
+      return sum + cost * quantity
+    }, 0)
+
+    const productProfit = totalProductSales - totalProductCost
+    const houseProfit = totalRechargeProfit + totalWithdrawalProfit
+    const netProfit = productProfit + houseProfit
+
+    const pendingWithdrawals = todayWithdrawals.filter(
+      (item) => item.status !== "COMPENSADO" && item.status !== "ANULADO"
+    )
+
+    const todayClosing = closings.find((item) =>
+      String(item.closingDate || "").startsWith(getTodayDate())
+    )
+
+    return {
+      todayRecharges,
+      todayWithdrawals,
+      todaySales,
+      totalRechargeProfit,
+      totalWithdrawalProfit,
+      totalProductSales,
+      totalProductCost,
+      productProfit,
+      houseProfit,
+      netProfit,
+      pendingWithdrawals,
+      todayClosing,
     }
+  }, [recharges, withdrawals, productSales, closings])
+
+  const totals = dashboard?.totals || {
+    recharges: 0,
+    withdrawals: 0,
+    cash: 0,
+    productSales: 0,
+    pendingDifference: 0,
   }
+
+  const cards = [
+    {
+      title: "Recargas de hoy",
+      value: formatMoney(totals.recharges),
+      detail: `${todayData.todayRecharges.length} operaciones`,
+      icon: Wallet,
+    },
+    {
+      title: "Retiros de hoy",
+      value: formatMoney(totals.withdrawals),
+      detail: `${todayData.pendingWithdrawals.length} pendientes`,
+      icon: ReceiptText,
+    },
+    {
+      title: "Caja recibida",
+      value: formatMoney(totals.cash),
+      detail: "Pagos de casas registrados",
+      icon: Banknote,
+    },
+    {
+      title: "Ventas productos",
+      value: formatMoney(totals.productSales),
+      detail: `${todayData.todaySales.length} ventas`,
+      icon: Package,
+    },
+  ]
 
   return (
     <AppShell title="Panel Admin">
@@ -82,102 +187,167 @@ export default function AdminPage() {
           </h1>
 
           <p className="mt-2 text-sm text-white/75">
-            Crea vendedores y controla los usuarios que pueden entrar al sistema.
+            Resumen general del día: recargas, retiros, caja, ventas y utilidad.
           </p>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {cards.map((item) => {
+            const Icon = item.icon
+
+            return (
+              <Card
+                key={item.title}
+                className="border-white/10 bg-[#0b0b0d] text-white shadow-xl"
+              >
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="text-sm font-semibold text-zinc-400">
+                    {item.title}
+                  </CardTitle>
+
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#d90416]/20 text-[#ffd400]">
+                    <Icon className="h-5 w-5" />
+                  </div>
+                </CardHeader>
+
+                <CardContent>
+                  <p className="text-3xl font-black">
+                    {loading ? "..." : item.value}
+                  </p>
+                  <p className="mt-2 text-sm text-zinc-500">{item.detail}</p>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card className="border-white/10 bg-[#0b0b0d] text-white">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-zinc-400">Ganancia productos</p>
+                <TrendingUp className="h-5 w-5 text-[#ffd400]" />
+              </div>
+
+              <p className="mt-2 text-3xl font-bold text-[#ffd400]">
+                {loading ? "..." : formatMoney(todayData.productProfit)}
+              </p>
+
+              <p className="mt-2 text-xs text-zinc-500">
+                Ventas menos costo de productos.
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-white/10 bg-[#0b0b0d] text-white">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-zinc-400">Ganancia casas</p>
+                <ArrowDownUp className="h-5 w-5 text-[#ffd400]" />
+              </div>
+
+              <p className="mt-2 text-3xl font-bold">
+                {loading ? "..." : formatMoney(todayData.houseProfit)}
+              </p>
+
+              <p className="mt-2 text-xs text-zinc-500">
+                Ganancia de recargas y retiros.
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-white/10 bg-[#0b0b0d] text-white">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-zinc-400">Utilidad neta</p>
+                <DollarSign className="h-5 w-5 text-[#ffd400]" />
+              </div>
+
+              <p className="mt-2 text-3xl font-bold text-emerald-300">
+                {loading ? "..." : formatMoney(todayData.netProfit)}
+              </p>
+
+              <p className="mt-2 text-xs text-zinc-500">
+                Productos + casas de apuestas.
+              </p>
+            </CardContent>
+          </Card>
         </div>
 
         <Card className="border-white/10 bg-[#0b0b0d] text-white shadow-2xl">
           <CardHeader className="border-b border-white/10">
-            <CardTitle className="flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-[#ffd400]" />
-              Crear vendedor
-            </CardTitle>
+            <CardTitle>Estado del cuadre de hoy</CardTitle>
           </CardHeader>
 
           <CardContent className="p-6">
-            <div className="grid gap-4 md:grid-cols-3">
-              <div className="space-y-2">
-                <Label className="text-zinc-300">Nombre</Label>
-                <Input
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="border-white/10 bg-black text-white"
-                />
-              </div>
+            {todayData.todayClosing ? (
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="rounded-2xl border border-white/10 bg-black p-4">
+                  <p className="text-sm text-zinc-500">Esperado</p>
+                  <p className="mt-1 text-2xl font-bold text-[#ffd400]">
+                    {formatMoney(todayData.todayClosing.expectedTotal)}
+                  </p>
+                </div>
 
-              <div className="space-y-2">
-                <Label className="text-zinc-300">Correo</Label>
-                <Input
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  className="border-white/10 bg-black text-white"
-                />
-              </div>
+                <div className="rounded-2xl border border-white/10 bg-black p-4">
+                  <p className="text-sm text-zinc-500">Real</p>
+                  <p className="mt-1 text-2xl font-bold">
+                    {formatMoney(todayData.todayClosing.realTotal)}
+                  </p>
+                </div>
 
-              <div className="space-y-2">
-                <Label className="text-zinc-300">Contraseña</Label>
-                <Input
-                    type="password"
-                    value={form.password}
-                    onChange={(e) =>
-                        setForm({ ...form, password: e.target.value })
-                    }
-                    className="border-white/10 bg-black text-white"
-                    />
+                <div className="rounded-2xl border border-white/10 bg-black p-4">
+                  <p className="text-sm text-zinc-500">Diferencia</p>
+                  <p
+                    className={`mt-1 text-2xl font-bold ${
+                      Number(todayData.todayClosing.differenceTotal || 0) === 0
+                        ? "text-emerald-300"
+                        : "text-[#ffd400]"
+                    }`}
+                  >
+                    {formatMoney(todayData.todayClosing.differenceTotal)}
+                  </p>
+                </div>
               </div>
-            </div>
-
-            <div className="mt-5 flex justify-end border-t border-white/10 pt-5">
-              <Button
-                onClick={createSeller}
-                disabled={saving}
-                className="bg-[#d90416] font-bold text-white hover:bg-[#ff1024]"
-              >
-                <Save className="mr-2 h-4 w-4" />
-                {saving ? "Guardando..." : "Crear vendedor"}
-              </Button>
-            </div>
+            ) : (
+              <div className="rounded-2xl border border-[#ffd400]/20 bg-[#ffd400]/10 p-4 text-sm text-[#ffd400]">
+                Todavía no se ha guardado el cuadre de hoy.
+              </div>
+            )}
           </CardContent>
         </Card>
 
         <Card className="border-white/10 bg-[#0b0b0d] text-white shadow-2xl">
           <CardHeader className="border-b border-white/10">
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-[#ffd400]" />
-              Usuarios del sistema
-            </CardTitle>
+            <CardTitle>Alertas rápidas</CardTitle>
           </CardHeader>
 
-          <CardContent className="p-6">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Correo</TableHead>
-                  <TableHead>Rol</TableHead>
-                  <TableHead>Estado</TableHead>
-                </TableRow>
-              </TableHeader>
+          <CardContent className="space-y-3 p-6">
+            <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-black p-4">
+              <div>
+                <p className="font-bold">Retiros pendientes</p>
+                <p className="mt-1 text-sm text-zinc-500">
+                  Retiros que todavía no están compensados.
+                </p>
+              </div>
 
-              <TableBody>
-                {users.map((user: any) => (
-                  <TableRow key={user.id}>
-                    <TableCell>{user.name}</TableCell>
-                    <TableCell>{user.email}</TableCell>
-                    <TableCell>
-                      <Badge className="bg-[#ffd400]/15 text-[#ffd400]">
-                        {user.role}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className="bg-emerald-500/15 text-emerald-300">
-                        Activo
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+              <Badge className="bg-[#ffd400]/15 text-[#ffd400] hover:bg-[#ffd400]/15">
+                {todayData.pendingWithdrawals.length}
+              </Badge>
+            </div>
+
+            <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-black p-4">
+              <div>
+                <p className="font-bold">Diferencia pendiente dashboard</p>
+                <p className="mt-1 text-sm text-zinc-500">
+                  Diferencia entre retiros y pagos de casas.
+                </p>
+              </div>
+
+              <Badge className="bg-orange-500/15 text-orange-300 hover:bg-orange-500/15">
+                {formatMoney(totals.pendingDifference)}
+              </Badge>
+            </div>
           </CardContent>
         </Card>
       </div>
