@@ -75,6 +75,9 @@ export default function CajaPage() {
   const [dailyCashBox, setDailyCashBox] = useState(null)
   const [dailyCashBoxHistory, setDailyCashBoxHistory] = useState([])
 
+  const [withdrawals, setWithdrawals] = useState([])
+  const [paymentForms, setPaymentForms] = useState({})
+
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -101,12 +104,20 @@ export default function CajaPage() {
     try {
       setLoading(true)
 
-      const [housesRes, banksRes, cashBoxRes, historyRes] = await Promise.all([
-        api.get("/api/bet-houses"),
-        api.get("/api/banks"),
-        api.get(`/api/daily-cash-box?date=${dateValue}`),
-        api.get("/api/daily-cash-box/history"),
-      ])
+      const [housesRes, banksRes, cashBoxRes, historyRes, withdrawalsRes] =
+        await Promise.all([
+          api.get("/api/bet-houses"),
+          api.get("/api/banks"),
+          api.get(`/api/daily-cash-box?date=${dateValue}`),
+          api.get("/api/daily-cash-box/history"),
+          api.get("/api/withdrawals"),
+        ])
+
+        const withdrawalsData = Array.isArray(withdrawalsRes.data)
+          ? withdrawalsRes.data
+          : []
+
+        setWithdrawals(withdrawalsData)
 
       const housesData = Array.isArray(housesRes.data) ? housesRes.data : []
       const banksData = Array.isArray(banksRes.data) ? banksRes.data : []
@@ -117,6 +128,7 @@ export default function CajaPage() {
       setBanks(banksData)
       setDailyCashBox(cashBoxData)
       setDailyCashBoxHistory(historyData)
+      setWithdrawals(withdrawalsData)
 
       setCashBoxForm({
         salesInitialCash:
@@ -372,6 +384,54 @@ export default function CajaPage() {
 
     return banks.filter((bank) => !registeredIds.has(String(bank.id)))
   }, [banks, bankCashBoxes])
+
+  const pendingWithdrawals = useMemo(() => {
+    return withdrawals.filter((item) => {
+      const dateKey = getDateKey(item.createdAt)
+
+      return (
+        dateKey === selectedDate &&
+        item.status !== "COMPENSADO" &&
+        item.status !== "ANULADO"
+      )
+    })
+  }, [withdrawals, selectedDate])
+
+  async function saveHousePayment(withdrawal) {
+    try {
+      const value = paymentForms[withdrawal.id] || withdrawal.amount
+
+      if (!value || Number(value) <= 0) {
+        alert("Ingresa el valor pagado por la casa.")
+        return
+      }
+
+      setSaving(true)
+
+      await api.post("/api/cash", {
+        type: "INGRESO",
+        amount: Number(value),
+        paymentMethod: "EFECTIVO",
+        receiptNumber: withdrawal.receiptNumber || null,
+        notes: `Pago de casa por retiro #${withdrawal.id}`,
+        betHouseId: withdrawal.betHouseId,
+        withdrawalId: withdrawal.id,
+      })
+
+      setPaymentForms((current) => ({
+        ...current,
+        [withdrawal.id]: "",
+      }))
+
+      await loadData(selectedDate)
+      alert("Pago de casa registrado correctamente.")
+    } catch (error) {
+      console.error(error)
+      alert(error.response?.data?.error || "Error registrando pago de casa.")
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <AppShell title="Caja">
@@ -1061,6 +1121,108 @@ export default function CajaPage() {
             </div>
           </CardContent>
         </Card>
+
+
+        <Card className="border-white/10 bg-[#0b0b0d] text-white shadow-2xl">
+  <CardHeader className="border-b border-white/10">
+    <CardTitle className="flex items-center gap-2 text-xl font-bold">
+      <Landmark className="h-5 w-5 text-[#ffd400]" />
+      Pagos pendientes de casas
+    </CardTitle>
+
+    <p className="text-sm text-zinc-400">
+      Aquí registras cuando la casa paga un retiro pendiente.
+    </p>
+  </CardHeader>
+
+  <CardContent className="p-6">
+    <div className="overflow-hidden rounded-2xl border border-white/10">
+      <Table>
+        <TableHeader>
+          <TableRow className="border-white/10 bg-white/[0.03]">
+            <TableHead className="text-zinc-400">ID</TableHead>
+            <TableHead className="text-zinc-400">Cliente</TableHead>
+            <TableHead className="text-zinc-400">Casa</TableHead>
+            <TableHead className="text-right text-zinc-400">Retiro</TableHead>
+            <TableHead className="text-right text-zinc-400">
+              Pago casa
+            </TableHead>
+            <TableHead className="text-zinc-400">Estado</TableHead>
+            <TableHead className="text-right text-zinc-400">Acción</TableHead>
+          </TableRow>
+        </TableHeader>
+
+        <TableBody>
+          {pendingWithdrawals.length === 0 ? (
+            <TableRow className="border-white/10">
+              <TableCell
+                colSpan={7}
+                className="py-10 text-center text-zinc-400"
+              >
+                No hay retiros pendientes para esta fecha.
+              </TableCell>
+            </TableRow>
+          ) : (
+            pendingWithdrawals.map((item) => (
+              <TableRow key={item.id} className="border-white/10">
+                <TableCell className="font-bold">{item.id}</TableCell>
+
+                <TableCell>
+                  <p className="font-medium text-white">
+                    {item.client?.name || "-"}
+                  </p>
+                  <p className="text-xs text-zinc-500">
+                    {item.client?.cedula || "-"}
+                  </p>
+                </TableCell>
+
+                <TableCell>{item.betHouse?.name || "-"}</TableCell>
+
+                <TableCell className="text-right font-bold text-[#ffd400]">
+                  {formatMoney(item.amount)}
+                </TableCell>
+
+                <TableCell className="text-right">
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={paymentForms[item.id] ?? String(item.amount || "")}
+                    onChange={(e) =>
+                      setPaymentForms((current) => ({
+                        ...current,
+                        [item.id]: e.target.value,
+                      }))
+                    }
+                    className="ml-auto h-9 max-w-[130px] border-white/10 bg-black text-right text-white"
+                  />
+                </TableCell>
+
+                <TableCell>
+                  <Badge className="bg-[#ffd400]/15 text-[#ffd400]">
+                    {item.status}
+                  </Badge>
+                </TableCell>
+
+                <TableCell className="text-right">
+                  <Button
+                    type="button"
+                    onClick={() => saveHousePayment(item)}
+                    disabled={saving}
+                    className="h-9 bg-[#d90416] font-bold text-white hover:bg-[#ff1024]"
+                  >
+                    <Save className="mr-2 h-4 w-4" />
+                    Registrar pago
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  </CardContent>
+</Card>
 
         <Card className="border-white/10 bg-[#0b0b0d] text-white shadow-2xl">
           <CardHeader className="border-b border-white/10">
