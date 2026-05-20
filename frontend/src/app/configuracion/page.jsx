@@ -16,28 +16,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import {
-  Banknote,
-  Building2,
-  Calculator,
-  RefreshCcw,
-  Save,
-  Settings,
-} from "lucide-react"
-
-function formatMoney(value) {
-  const number = Number(value || 0)
-
-  return new Intl.NumberFormat("es-EC", {
-    style: "currency",
-    currency: "USD",
-  }).format(number)
-}
+import { Banknote, Building2, Settings } from "lucide-react"
 
 export default function ConfiguracionPage() {
   const [betHouses, setBetHouses] = useState([])
   const [banks, setBanks] = useState([])
-  const [commissionSettings, setCommissionSettings] = useState([])
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -45,50 +28,17 @@ export default function ConfiguracionPage() {
   const [newBank, setNewBank] = useState("")
   const [newHouse, setNewHouse] = useState("")
 
-  const [commissionForm, setCommissionForm] = useState({})
-
   async function loadData() {
     try {
       setLoading(true)
 
-      const [housesRes, banksRes, commissionsRes] = await Promise.all([
+      const [housesRes, banksRes] = await Promise.all([
         api.get("/api/bet-houses"),
         api.get("/api/banks"),
-        api.get("/api/commission-settings"),
       ])
 
-      const housesData = Array.isArray(housesRes.data) ? housesRes.data : []
-      const banksData = Array.isArray(banksRes.data) ? banksRes.data : []
-      const commissionsData = Array.isArray(commissionsRes.data)
-        ? commissionsRes.data
-        : []
-
-      setBetHouses(housesData)
-      setBanks(banksData)
-      setCommissionSettings(commissionsData)
-
-      const initialForm = {}
-
-      for (const house of housesData) {
-        const rechargeSetting = commissionsData.find(
-          (item) =>
-            String(item.betHouseId) === String(house.id) &&
-            item.operationType === "RECARGA"
-        )
-
-        const withdrawalSetting = commissionsData.find(
-          (item) =>
-            String(item.betHouseId) === String(house.id) &&
-            item.operationType === "RETIRO"
-        )
-
-        initialForm[house.id] = {
-          recharge: String(rechargeSetting?.amount ?? 0),
-          withdrawal: String(withdrawalSetting?.amount ?? 0),
-        }
-      }
-
-      setCommissionForm(initialForm)
+      setBetHouses(Array.isArray(housesRes.data) ? housesRes.data : [])
+      setBanks(Array.isArray(banksRes.data) ? banksRes.data : [])
     } catch (error) {
       console.error(error)
       alert("No se pudo cargar configuración. Revisa que el backend esté encendido.")
@@ -108,55 +58,6 @@ export default function ConfiguracionPage() {
     }
   }, [betHouses, banks])
 
-  function updateCommissionField(houseId, field, value) {
-    setCommissionForm((prev) => ({
-      ...prev,
-      [houseId]: {
-        ...(prev[houseId] || {}),
-        [field]: value,
-      },
-    }))
-  }
-
-  async function saveHouseCommissions(houseId) {
-    try {
-      const values = commissionForm[houseId] || {}
-
-      const rechargeAmount = Number(values.recharge || 0)
-      const withdrawalAmount = Number(values.withdrawal || 0)
-
-      if (rechargeAmount < 0 || withdrawalAmount < 0) {
-        alert("Las comisiones no pueden ser negativas.")
-        return
-      }
-
-      setSaving(true)
-
-      await Promise.all([
-        api.post("/api/commission-settings", {
-          betHouseId: Number(houseId),
-          operationType: "RECARGA",
-          amount: rechargeAmount,
-          active: true,
-        }),
-        api.post("/api/commission-settings", {
-          betHouseId: Number(houseId),
-          operationType: "RETIRO",
-          amount: withdrawalAmount,
-          active: true,
-        }),
-      ])
-
-      await loadData()
-      alert("Comisiones guardadas correctamente.")
-    } catch (error) {
-      console.error(error)
-      alert(error.response?.data?.error || "Error guardando comisiones.")
-    } finally {
-      setSaving(false)
-    }
-  }
-
   async function createBank() {
     try {
       const name = newBank.trim()
@@ -168,9 +69,7 @@ export default function ConfiguracionPage() {
 
       setSaving(true)
 
-      await api.post("/api/banks", {
-        name,
-      })
+      await api.post("/api/banks", { name })
 
       setNewBank("")
       await loadData()
@@ -194,28 +93,7 @@ export default function ConfiguracionPage() {
 
       setSaving(true)
 
-      const houseRes = await api.post("/api/bet-houses", {
-        name,
-      })
-
-      const house = houseRes.data
-
-      if (house?.id) {
-        await Promise.all([
-          api.post("/api/commission-settings", {
-            betHouseId: Number(house.id),
-            operationType: "RECARGA",
-            amount: 0,
-            active: true,
-          }),
-          api.post("/api/commission-settings", {
-            betHouseId: Number(house.id),
-            operationType: "RETIRO",
-            amount: 0,
-            active: true,
-          }),
-        ])
-      }
+      await api.post("/api/bet-houses", { name })
 
       setNewHouse("")
       await loadData()
@@ -243,8 +121,8 @@ export default function ConfiguracionPage() {
               </h1>
 
               <p className="mt-2 max-w-3xl text-sm text-white/75">
-                Administra las casas de apuestas, bancos y comisiones que se
-                aplicarán automáticamente en recargas y retiros.
+                Administra las casas de apuestas y bancos disponibles para
+                recargas, retiros, caja y cuadre.
               </p>
             </div>
 
@@ -255,164 +133,22 @@ export default function ConfiguracionPage() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-  <Card className="border-white/10 bg-[#0b0b0d] text-white">
-    <CardContent className="p-5">
-      <p className="text-sm text-zinc-400">Casas activas</p>
-      <p className="mt-2 text-3xl font-bold text-[#ffd400]">
-        {totals.houses}
-      </p>
-    </CardContent>
-  </Card>
+          <Card className="border-white/10 bg-[#0b0b0d] text-white">
+            <CardContent className="p-5">
+              <p className="text-sm text-zinc-400">Casas activas</p>
+              <p className="mt-2 text-3xl font-bold text-[#ffd400]">
+                {totals.houses}
+              </p>
+            </CardContent>
+          </Card>
 
-  <Card className="border-white/10 bg-[#0b0b0d] text-white">
-    <CardContent className="p-5">
-      <p className="text-sm text-zinc-400">Bancos activos</p>
-      <p className="mt-2 text-3xl font-bold">{totals.banks}</p>
-    </CardContent>
-  </Card>
-</div>
-
-        <Card className="border-white/10 bg-[#0b0b0d] text-white shadow-2xl">
-          <CardHeader className="border-b border-white/10">
-            <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
-              <div>
-                <CardTitle className="flex items-center gap-2 text-xl font-bold">
-                  <Calculator className="h-5 w-5 text-[#ffd400]" />
-                  Comisiones por casa
-                </CardTitle>
-
-                <p className="mt-1 text-sm text-zinc-400">
-                  Estos valores se usarán automáticamente cuando registres una
-                  nueva recarga o retiro.
-                </p>
-              </div>
-
-              <Button
-                type="button"
-                onClick={loadData}
-                disabled={loading}
-                className="h-11 border border-white/10 bg-black font-semibold text-white hover:bg-white/10"
-              >
-                <RefreshCcw className="mr-2 h-4 w-4" />
-                Actualizar
-              </Button>
-            </div>
-          </CardHeader>
-
-          <CardContent className="p-6">
-            <div className="overflow-hidden rounded-2xl border border-white/10">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-white/10 bg-white/[0.03] hover:bg-white/[0.03]">
-                    <TableHead className="text-zinc-400">Casa</TableHead>
-                    <TableHead className="text-zinc-400">
-                    % comisión recarga
-                    </TableHead>
-                    <TableHead className="text-zinc-400">
-                    % comisión retiro
-                    </TableHead>
-                    <TableHead className="text-zinc-400">Estado</TableHead>
-                    <TableHead className="text-right text-zinc-400">
-                      Acción
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-
-                <TableBody>
-                  {loading ? (
-                    <TableRow className="border-white/10">
-                      <TableCell
-                        colSpan={5}
-                        className="py-8 text-center text-zinc-400"
-                      >
-                        Cargando configuración...
-                      </TableCell>
-                    </TableRow>
-                  ) : betHouses.length === 0 ? (
-                    <TableRow className="border-white/10">
-                      <TableCell
-                        colSpan={5}
-                        className="py-10 text-center text-zinc-400"
-                      >
-                        No hay casas registradas.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    betHouses.map((house) => (
-                      <TableRow
-                        key={house.id}
-                        className="border-white/10 hover:bg-white/[0.03]"
-                      >
-                        <TableCell>
-                          <div>
-                            <p className="font-bold text-white">{house.name}</p>
-                            <p className="text-xs text-zinc-500">
-                              ID: {house.id}
-                            </p>
-                          </div>
-                        </TableCell>
-
-                        <TableCell>
-                          <Input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={commissionForm[house.id]?.recharge || ""}
-                            onChange={(e) =>
-                              updateCommissionField(
-                                house.id,
-                                "recharge",
-                                e.target.value
-                              )
-                            }
-                            placeholder="0.00 %"
-                            className="h-10 max-w-[160px] border-white/10 bg-black text-white placeholder:text-zinc-600"
-                          />
-                        </TableCell>
-
-                        <TableCell>
-                          <Input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={commissionForm[house.id]?.withdrawal || ""}
-                            onChange={(e) =>
-                              updateCommissionField(
-                                house.id,
-                                "withdrawal",
-                                e.target.value
-                              )
-                            }
-                            placeholder="0.00"
-                            className="h-10 max-w-[160px] border-white/10 bg-black text-white placeholder:text-zinc-600"
-                          />
-                        </TableCell>
-
-                        <TableCell>
-                          <Badge className="bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/15">
-                            Activa
-                          </Badge>
-                        </TableCell>
-
-                        <TableCell className="text-right">
-                          <Button
-                            type="button"
-                            onClick={() => saveHouseCommissions(house.id)}
-                            disabled={saving}
-                            className="h-10 bg-[#d90416] font-semibold text-white hover:bg-[#ff1024]"
-                          >
-                            <Save className="mr-2 h-4 w-4" />
-                            Guardar
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
+          <Card className="border-white/10 bg-[#0b0b0d] text-white">
+            <CardContent className="p-5">
+              <p className="text-sm text-zinc-400">Bancos activos</p>
+              <p className="mt-2 text-3xl font-bold">{totals.banks}</p>
+            </CardContent>
+          </Card>
+        </div>
 
         <div className="grid gap-6 lg:grid-cols-2">
           <Card className="border-white/10 bg-[#0b0b0d] text-white shadow-2xl">
@@ -423,7 +159,7 @@ export default function ConfiguracionPage() {
               </CardTitle>
 
               <p className="text-sm text-zinc-400">
-                Agrega bancos para usarlos en recargas y caja.
+                Agrega bancos para usarlos en recargas, ventas, caja y cuadre.
               </p>
             </CardHeader>
 
@@ -461,7 +197,16 @@ export default function ConfiguracionPage() {
                   </TableHeader>
 
                   <TableBody>
-                    {banks.length === 0 ? (
+                    {loading ? (
+                      <TableRow className="border-white/10">
+                        <TableCell
+                          colSpan={2}
+                          className="py-8 text-center text-zinc-400"
+                        >
+                          Cargando bancos...
+                        </TableCell>
+                      </TableRow>
+                    ) : banks.length === 0 ? (
                       <TableRow className="border-white/10">
                         <TableCell
                           colSpan={2}
@@ -542,7 +287,16 @@ export default function ConfiguracionPage() {
                   </TableHeader>
 
                   <TableBody>
-                    {betHouses.length === 0 ? (
+                    {loading ? (
+                      <TableRow className="border-white/10">
+                        <TableCell
+                          colSpan={2}
+                          className="py-8 text-center text-zinc-400"
+                        >
+                          Cargando casas...
+                        </TableCell>
+                      </TableRow>
+                    ) : betHouses.length === 0 ? (
                       <TableRow className="border-white/10">
                         <TableCell
                           colSpan={2}
