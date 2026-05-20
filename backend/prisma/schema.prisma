@@ -75,6 +75,7 @@ model Recharge {
   userId        Int?
   amount        Float
   commission    Float    @default(0)
+  adminProfit   Float    @default(0)
   paymentMethod String
   receiptNumber String?
   notes         String?
@@ -88,19 +89,21 @@ model Recharge {
 }
 
 model Withdrawal {
-  id             Int      @id @default(autoincrement())
-  clientId       Int
-  betHouseId     Int
-  userId         Int?
-  amount         Float
-  commission     Float    @default(0)
-  withdrawalCode String?
-  receiptNumber  String?
-  paidToClient   Boolean  @default(false)
-  notes          String?
-  status         String   @default("PENDIENTE")
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id              Int      @id @default(autoincrement())
+  clientId        Int
+  betHouseId      Int
+  userId          Int?
+  amount          Float
+  commission      Float    @default(0)
+  housePaidAmount Float    @default(0)
+  adminProfit     Float    @default(0)
+  withdrawalCode  String?
+  receiptNumber   String?
+  paidToClient    Boolean  @default(false)
+  notes           String?
+  status          String   @default("PENDIENTE")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   client      Client      @relation(fields: [clientId], references: [id])
   betHouse    BetHouse    @relation(fields: [betHouseId], references: [id])

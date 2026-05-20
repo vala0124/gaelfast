@@ -932,6 +932,7 @@ app.post("/api/recharges", async (req, res) => {
       receiptNumber,
       notes,
       status,
+      adminProfit,
     } = req.body
 
     if (!betHouseId || !amount || !paymentMethod) {
@@ -996,6 +997,7 @@ app.post("/api/recharges", async (req, res) => {
                 betHouseId: Number(betHouseId),
                 amount: numericAmount,
                 commission: 0,
+                adminProfit: toNumber(adminProfit),
                 paymentMethod,
                 receiptNumber: receiptNumber || null,
                 notes:
@@ -1022,6 +1024,46 @@ app.post("/api/recharges", async (req, res) => {
 
     res.status(500).json({
       error: "Error creando recarga",
+    })
+  }
+})
+
+
+app.patch("/api/recharges/:id/profit", async (req, res) => {
+  try {
+    const rechargeId = Number(req.params.id)
+    const { adminProfit } = req.body
+
+    if (!rechargeId) {
+      return res.status(400).json({
+        error: "ID de recarga inválido",
+      })
+    }
+
+    const profit = toNumber(adminProfit)
+
+    if (profit < 0) {
+      return res.status(400).json({
+        error: "La ganancia no puede ser negativa",
+      })
+    }
+
+    const recharge = await prisma.recharge.update({
+      where: { id: rechargeId },
+      data: {
+        adminProfit: profit,
+      },
+      include: {
+        client: true,
+        betHouse: true,
+      },
+    })
+
+    res.json(recharge)
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({
+      error: "Error actualizando ganancia de recarga",
     })
   }
 })
@@ -1079,6 +1121,7 @@ app.post("/api/withdrawals", async (req, res) => {
       paidToClient,
       notes,
       status,
+      housePaidAmount,
     } = req.body
 
     if (!betHouseId || !amount) {
@@ -1136,12 +1179,18 @@ app.post("/api/withdrawals", async (req, res) => {
       }
     }
 
+    const numericHousePaidAmount = toNumber(housePaidAmount)
+    const numericAdminProfit =
+      numericHousePaidAmount > 0 ? numericHousePaidAmount - numericAmount : 0
+
     const withdrawal = await prisma.withdrawal.create({
       data: {
         clientId: finalClientId,
         betHouseId: Number(betHouseId),
         amount: numericAmount,
         commission: 0,
+        housePaidAmount: numericHousePaidAmount,
+        adminProfit: numericAdminProfit,
         withdrawalCode: withdrawalCode || null,
         receiptNumber: receiptNumber || null,
         paidToClient: Boolean(paidToClient),
@@ -1166,6 +1215,60 @@ app.post("/api/withdrawals", async (req, res) => {
 
     res.status(500).json({
       error: "Error creando retiro",
+    })
+  }
+})
+
+
+app.patch("/api/withdrawals/:id/house-payment", async (req, res) => {
+  try {
+    const withdrawalId = Number(req.params.id)
+    const { housePaidAmount } = req.body
+
+    if (!withdrawalId) {
+      return res.status(400).json({
+        error: "ID de retiro inválido",
+      })
+    }
+
+    const withdrawal = await prisma.withdrawal.findUnique({
+      where: { id: withdrawalId },
+    })
+
+    if (!withdrawal) {
+      return res.status(404).json({
+        error: "Retiro no encontrado",
+      })
+    }
+
+    const paid = toNumber(housePaidAmount)
+
+    if (paid < 0) {
+      return res.status(400).json({
+        error: "El valor pagado por la casa no puede ser negativo",
+      })
+    }
+
+    const profit = paid - Number(withdrawal.amount || 0)
+
+    const updated = await prisma.withdrawal.update({
+      where: { id: withdrawalId },
+      data: {
+        housePaidAmount: paid,
+        adminProfit: profit,
+      },
+      include: {
+        client: true,
+        betHouse: true,
+        cashEntries: true,
+      },
+    })
+
+    res.json(updated)
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({
+      error: "Error actualizando pago de casa",
     })
   }
 })
