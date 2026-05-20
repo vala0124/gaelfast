@@ -720,45 +720,29 @@ export default function VentasProductosPage() {
                   <TableRow className="border-white/10 bg-white/[0.03] hover:bg-white/[0.03]">
                     <TableHead className="text-zinc-400">Fecha</TableHead>
                     <TableHead className="text-zinc-400">Producto</TableHead>
-                    <TableHead className="text-zinc-400">Método</TableHead>
-                    <TableHead className="text-zinc-400">Comprobante</TableHead>
-                    <TableHead className="text-right text-zinc-400">
-                      Cantidad
-                    </TableHead>
-                    <TableHead className="text-right text-zinc-400">
-                      Precio
-                    </TableHead>
-                    <TableHead className="text-right text-zinc-400">
-                      Total
-                    </TableHead>
+                    <TableHead className="text-zinc-400">Pago</TableHead>
+                    <TableHead className="text-right text-zinc-400">Cantidad</TableHead>
+                    <TableHead className="text-right text-zinc-400">Precio</TableHead>
+                    <TableHead className="text-right text-zinc-400">Total</TableHead>
                   </TableRow>
                 </TableHeader>
 
                 <TableBody>
                   {loading ? (
                     <TableRow className="border-white/10">
-                      <TableCell
-                        colSpan={7}
-                        className="py-8 text-center text-zinc-400"
-                      >
+                      <TableCell colSpan={6} className="py-8 text-center text-zinc-400">
                         Cargando ventas...
                       </TableCell>
                     </TableRow>
                   ) : filteredSales.length === 0 ? (
                     <TableRow className="border-white/10">
-                      <TableCell
-                        colSpan={7}
-                        className="py-10 text-center text-zinc-400"
-                      >
+                      <TableCell colSpan={6} className="py-10 text-center text-zinc-400">
                         No hay ventas registradas para este filtro.
                       </TableCell>
                     </TableRow>
                   ) : (
                     filteredSales.map((sale) => (
-                      <TableRow
-                        key={sale.id}
-                        className="border-white/10 hover:bg-white/[0.03]"
-                      >
+                      <TableRow key={sale.id} className="border-white/10 hover:bg-white/[0.03]">
                         <TableCell className="text-zinc-400">
                           {formatDate(sale.createdAt)}
                         </TableCell>
@@ -769,30 +753,29 @@ export default function VentasProductosPage() {
                               {sale.product?.name || "-"}
                             </p>
                             <p className="text-xs text-zinc-500">
-                              {sale.product?.barcode || "-"} ·{" "}
-                              {sale.product?.category || "-"}
+                              {sale.product?.barcode || "-"} · {sale.product?.category || "-"}
                             </p>
                           </div>
                         </TableCell>
 
                         <TableCell>
-                          <Badge
-                            className={
-                              sale.paymentMethod === "EFECTIVO"
-                                ? "bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/15"
-                                : "bg-[#ffd400]/15 text-[#ffd400] hover:bg-[#ffd400]/15"
-                            }
-                          >
-                            {sale.paymentMethod}
-                          </Badge>
-                        </TableCell>
+                          <div>
+                            <Badge
+                              className={
+                                sale.paymentMethod === "EFECTIVO"
+                                  ? "bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/15"
+                                  : "bg-[#ffd400]/15 text-[#ffd400] hover:bg-[#ffd400]/15"
+                              }
+                            >
+                              {sale.paymentMethod}
+                            </Badge>
 
-                        <TableCell className="text-zinc-400">
-                          {sale.paymentMethod === "TRANSFERENCIA"
-                            ? `${sale.bankName || "-"} · #${
-                                sale.receiptNumber || "-"
-                              }`
-                            : "-"}
+                            <p className="mt-2 text-xs text-zinc-500">
+                              {sale.paymentMethod === "TRANSFERENCIA"
+                                ? `${sale.bankName || "-"} · Comp. ${sale.receiptNumber || "-"}`
+                                : "Pago en local"}
+                            </p>
+                          </div>
                         </TableCell>
 
                         <TableCell className="text-right font-bold text-white">
