@@ -2,7 +2,6 @@
 
 import Image from "next/image"
 import { useState } from "react"
-import type { KeyboardEvent } from "react"
 import { Eye, EyeOff } from "lucide-react"
 import { api } from "@/lib/api"
 import { Button } from "@/components/ui/button"
@@ -15,7 +14,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  async function handleLogin() {
+    async function handleLogin() {
     try {
       if (!email.trim()) {
         alert("Ingresa el correo.")
@@ -43,15 +42,15 @@ export default function LoginPage() {
       }
 
       window.location.href = "/dashboard"
-    } catch (error: any) {
+    } catch (error) {
       console.error(error)
-      alert(error.response?.data?.error || "No se pudo iniciar sesión.")
+      alert(apiError.response?.data?.error || "No se pudo iniciar sesión.")
     } finally {
       setLoading(false)
     }
   }
 
-  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    function handleKeyDown(event) {
     if (event.key === "Enter") {
       event.preventDefault()
       handleLogin()
