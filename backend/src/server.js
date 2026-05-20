@@ -118,22 +118,88 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {
 })
 
 /* =========================
+   USUARIOS / ADMIN
+========================= */
+app.get("/api/users", async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        active: true,
+        createdAt: true,
+      },
+    })
+
+    res.json(users)
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({
+      error: "Error obteniendo usuarios",
+    })
+  }
+})
+
+app.post("/api/users/sellers", async (req, res) => {
+  try {
+    const { name, email, password } = req.body
+
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        error: "Nombre, correo y contraseña son obligatorios",
+      })
+    }
+
+    const hashed = await bcrypt.hash(String(password), 10)
+
+    const seller = await prisma.user.create({
+      data: {
+        name: String(name).trim(),
+        email: String(email).trim().toLowerCase(),
+        password: hashed,
+        role: "VENDEDOR",
+        active: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        active: true,
+        createdAt: true,
+      },
+    })
+
+    res.status(201).json(seller)
+  } catch (error) {
+    console.error(error)
+
+    if (error.code === "P2002") {
+      return res.status(400).json({
+        error: "Ya existe un usuario con ese correo",
+      })
+    }
+
+    res.status(500).json({
+      error: "Error creando vendedor",
+    })
+  }
+})
+
+/* =========================
    SEED INICIAL
 ========================= */
 app.post("/api/seed", async (req, res) => {
   try {
     const defaultUsers = [
       {
-        name: "Administrador",
-        email: "admin@empresa.com",
-        password: "123456",
+        name: "Klever Admin",
+        email: "kleveradmin@gaelfast.com",
+        password: "1105385965",
         role: "ADMIN",
-      },
-      {
-        name: "Klever Ágreda",
-        email: "kleverventas@gaelfast.com",
-        password: "123456",
-        role: "VENDEDOR",
       },
     ]
 
@@ -223,6 +289,8 @@ app.post("/api/seed", async (req, res) => {
     })
   }
 })
+
+
 
 /* =========================
    DASHBOARD

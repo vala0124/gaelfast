@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import {
   LayoutDashboard,
@@ -14,9 +15,10 @@ import {
   Zap,
   PanelLeftClose,
   PanelLeftOpen,
+  ShieldCheck,
 } from "lucide-react"
 
-const menu = [
+const sellerMenu = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Clientes", href: "/clientes", icon: Users },
   { label: "Recargas", href: "/recargas", icon: Wallet },
@@ -27,12 +29,29 @@ const menu = [
   { label: "Ventas productos", href: "/ventas-productos", icon: ShoppingCart },
 ]
 
+const adminMenu = [
+  { label: "Panel Admin", href: "/admin", icon: ShieldCheck },
+  ...sellerMenu,
+]
+
 export default function Sidebar({
   collapsed = false,
   onToggle,
   mobile = false,
   onNavigate,
 }) {
+  const [user, setUser] = useState(null)
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user")
+
+    if (storedUser) {
+      setUser(JSON.parse(storedUser))
+    }
+  }, [])
+
+  const menu = user?.role === "ADMIN" ? adminMenu : sellerMenu
+
   const asideClass = mobile
     ? "block min-h-screen w-72 border-r border-white/10 bg-[#070707] p-4"
     : `hidden min-h-screen border-r border-white/10 bg-[#070707] p-4 transition-all duration-300 md:block ${
@@ -119,20 +138,22 @@ export default function Sidebar({
         })}
       </nav>
 
-      <div className="mt-8 border-t border-white/10 pt-4">
-        <Link
-          href="/configuracion"
-          onClick={onNavigate}
-          title={collapsed ? "Configuración" : undefined}
-          className={`flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold text-zinc-400 transition hover:bg-white/5 hover:text-white ${
-            collapsed ? "justify-center" : ""
-          }`}
-        >
-          <Settings className="h-5 w-5 shrink-0 text-[#ffd400]" />
+      {user?.role === "ADMIN" && (
+        <div className="mt-8 border-t border-white/10 pt-4">
+          <Link
+            href="/configuracion"
+            onClick={onNavigate}
+            title={collapsed ? "Configuración" : undefined}
+            className={`flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold text-zinc-400 transition hover:bg-white/5 hover:text-white ${
+              collapsed ? "justify-center" : ""
+            }`}
+          >
+            <Settings className="h-5 w-5 shrink-0 text-[#ffd400]" />
 
-          {!collapsed && <span>Configuración</span>}
-        </Link>
-      </div>
+            {!collapsed && <span>Configuración</span>}
+          </Link>
+        </div>
+      )}
     </aside>
   )
 }
