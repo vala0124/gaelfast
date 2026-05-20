@@ -37,6 +37,7 @@ const adminMenu = [
   { label: "Caja Admin", href: "/admin/caja", icon: ArrowDownUp },
   { label: "Productos Stock", href: "/admin/productos", icon: Package },
   { label: "Usuarios", href: "/admin/usuarios", icon: Users },
+  { label: "Configuración", href: "/configuracion", icon: Settings },
 ]
 
 export default function Sidebar({
@@ -142,23 +143,6 @@ export default function Sidebar({
           )
         })}
       </nav>
-
-      {user?.role === "ADMIN" && (
-        <div className="mt-8 border-t border-white/10 pt-4">
-          <Link
-            href="/configuracion"
-            onClick={onNavigate}
-            title={collapsed ? "Configuración" : undefined}
-            className={`flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold text-zinc-400 transition hover:bg-white/5 hover:text-white ${
-              collapsed ? "justify-center" : ""
-            }`}
-          >
-            <Settings className="h-5 w-5 shrink-0 text-[#ffd400]" />
-
-            {!collapsed && <span>Configuración</span>}
-          </Link>
-        </div>
-      )}
     </aside>
   )
 }
