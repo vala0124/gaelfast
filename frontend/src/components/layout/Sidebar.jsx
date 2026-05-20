@@ -31,6 +31,11 @@ const sellerMenu = [
 
 const adminMenu = [
   { label: "Panel Admin", href: "/admin", icon: ShieldCheck },
+  { label: "Admin Recargas", href: "/admin/recargas", icon: Wallet },
+  { label: "Admin Retiros", href: "/admin/retiros", icon: ReceiptText },
+  { label: "Rentabilidad", href: "/admin/rentabilidad", icon: Calculator },
+  { label: "Caja Admin", href: "/admin/caja", icon: ArrowDownUp },
+  { label: "Usuarios", href: "/admin/usuarios", icon: Users },
   ...sellerMenu,
 ]
 
